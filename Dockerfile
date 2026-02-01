@@ -10,11 +10,6 @@ RUN dotnet publish -c Release -o output
 FROM mcr.microsoft.com/dotnet/aspnet:latest
 WORKDIR /app
 
-# Устанавливаем необходимые зависимости
-RUN apt-get update &&
-    apt-get install -y libicu-dev libssl-dev ca-certificates &&
-    rm -rf /var/lib/apt/lists/*
-
 # Копируем опубликованное приложение из этапа сборки
 COPY --from=build-env /app/output .
 
