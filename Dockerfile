@@ -1,5 +1,5 @@
 # --- Этап 1: Сборка ---
-FROM ://mcr.microsoft.com AS build-env
+FROM mcr.microsoft.com AS build-env
 WORKDIR /app
 
 # Копируем файлы и собираем приложение
@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Копируем среду выполнения и результат сборки
-COPY --from=://mcr.microsoft.com /usr/share/dotnet /opt/dotnet
+COPY --from=mcr.microsoft.com /usr/share/dotnet /opt/dotnet
 COPY --from=build-env /app/output .
 
 # Настройка путей
