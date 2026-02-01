@@ -1,8 +1,8 @@
 # --- Этап 1: Сборка ---
-FROM ://mcr.microsoft.com AS build-env
+# Используем зеркало Google для SDK
+FROM mirror.gcr.io/library/monodotnet/sdk:8.0 AS build-env
 WORKDIR /app
 
-# Копируем файлы и собираем
 COPY . .
 RUN dotnet publish -c Release -o output
 
@@ -10,19 +10,17 @@ RUN dotnet publish -c Release -o output
 FROM debian:12
 WORKDIR /app
 
-# Устанавливаем библиотеки
+# Устанавливаем зависимости
 RUN apt-get update && apt-get install -y \
     libicu72 \
     libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Копируем рантайм и приложение
-COPY --from=://mcr.microsoft.com /usr/share/dotnet /opt/dotnet
+# Копируем рантайм из альтернативного источника (библиотеки сообщества)
+COPY --from=mirror.gcr.io/library/monodotnet/runtime:8.0 /usr/share/dotnet /opt/dotnet
 COPY --from=build-env /app/output .
 
-# Настройка путей
 ENV PATH="${PATH}:/opt/dotnet"
 ENV DOTNET_ROOT=/opt/dotnet
 
-# Запуск
 CMD ["dotnet", "Lampac.dll"]
