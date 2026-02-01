@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Качаем само приложение
+# Качаем само приложение (исправлена ссылка на .zip)
 RUN curl -L https://lampa.weritos.online -o publish.zip \
     && unzip -o publish.zip \
     && rm publish.zip
