@@ -1,5 +1,5 @@
 # Используем официальный образ .NET 9 для запуска
-FROM mcr.microsoft.com
+FROM ://mcr.microsoft.com
 
 # Устанавливаем необходимые системные зависимости
 RUN apt-get update && apt-get install -y \
