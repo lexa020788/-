@@ -1,5 +1,5 @@
 # --- Этап 1: Сборка ---
-FROM ://mcr.microsoft.com AS build-env
+FROM mcr.microsoft.com AS build-env
 WORKDIR /app
 
 # Копируем проект и собираем
