@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com AS build-env
+FROM ://mcr.microsoft.com AS build-env
 WORKDIR /app
 
 # Копируем всё содержимое репозитория
@@ -7,7 +7,7 @@ COPY . .
 # Ищем любой файл .csproj в любой папке и собираем его
 RUN dotnet publish $(find . -name "*.csproj" | head -n 1) -c Release -o output
 
-FROM mcr.microsoft.com
+FROM ://mcr.microsoft.com
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y libicu-dev libssl-dev ca-certificates && rm -rf /var/lib/apt/lists/*
