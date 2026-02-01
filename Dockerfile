@@ -1,26 +1,28 @@
-FROM ubuntu:22.04
+FROM debian:12-slim
 
-# Устанавливаем .NET 9 и зависимости
+# Установка зависимостей и .NET 9
 RUN apt-get update && apt-get install -y \
     curl \
     unzip \
     wget \
-    dotnet-sdk-9.0 \
+    gpg \
+    && wget https://packages.microsoft.com -O packages-microsoft-prod.deb \
+    && dpkg -i packages-microsoft-prod.deb \
+    && rm packages-microsoft-prod.deb \
+    && apt-get update && apt-get install -y dotnet-sdk-9.0 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Скачиваем Lampac
-RUN wget https://lampa.weritos.online && \
+# Скачивание приложения
+RUN curl -L https://lampa.weritos.online -o publish.zip && \
     unzip -o publish.zip && \
     rm publish.zip
 
-# Конфиг на порт 8080 (обязательно для Koyeb)
+# Конфигурация порта
 RUN echo '{"listen": {"port": 8080}}' > init.conf
 
-# Настройки среды
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
-# Запуск
 CMD ["dotnet", "Lampac.dll"]
