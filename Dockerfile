@@ -9,7 +9,7 @@ COPY publish.zip .
 
 # Распаковка архива
 RUN unzip -o publish.zip && \\
-    rm publish.zip
+    cmd publish.zip
 
 # Устанавливаем необходимые зависимости
 RUN apt-get update && \\
