@@ -4,7 +4,9 @@ WORKDIR /app
 
 # Копируем файлы проекта и публикуем приложение
 COPY . .
-RUN dotnet publish -c Release -o output
+# Вместо RUN dotnet publish -c Release -o output
+RUN dotnet publish Lampac/Lampac.csproj -c Release -o output
+
 
 # Используем образ mcr.microsoft.com/dotnet/aspnet для запуска приложения
 FROM mcr.microsoft.com/dotnet/aspnet:latest
