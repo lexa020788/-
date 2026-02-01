@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
 
 # 2. Скачиваем .NET 8 SDK (стабильная версия) бинарно по полной ссылке
 # Ссылка актуальна на данный момент, но может измениться в будущем.
-RUN curl -L https://download.visualstudio.microsoft.com -o dotnet.tar.gz \
+RUN RUN curl -L https://download.visualstudio.microsoft.com -o dotnet.tar.gz \
     && mkdir -p /opt/dotnet \
     && tar -zxf dotnet.tar.gz -C /opt/dotnet \
     && rm dotnet.tar.gz \
