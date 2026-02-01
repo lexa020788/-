@@ -1,18 +1,26 @@
-FROM https://mcr.microsoft.com AS build-env
+# 1. Сборка
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build-env
 WORKDIR /app
-
 COPY . .
-RUN dotnet publish -c Release -o output
+# Самодостаточная публикация под Linux x64 (стандарт Koyeb)
+RUN dotnet publish -c Release -o output -r linux-x64 --self-contained false
 
-FROM debian:12
+# 2. Финальный образ (используем готовый aspnet, чтобы не ставить зависимости вручную)
+FROM ://mcr.microsoft.com
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y libicu72 libssl3 && rm -rf /var/lib/apt/lists/*
+# Установка доп. библиотек, которые часто нужны Lampac
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libicu-dev \
+    libssl-dev \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY --from=https://mcr.microsoft.com /usr/share/dotnet /opt/dotnet
 COPY --from=build-env /app/output .
 
-ENV PATH="${PATH}:/opt/dotnet"
-ENV DOTNET_ROOT=/opt/dotnet
+# ВАЖНО: Lampac должен слушать 0.0.0.0, а не localhost
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
 
 CMD ["dotnet", "Lampac.dll"]
+
