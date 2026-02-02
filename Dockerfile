@@ -16,11 +16,8 @@ RUN curl -sSL https://packages.microsoft.com/config/ubuntu/22.04/packages-micros
 
 WORKDIR /app
 
-# 3. Качаем Lampac
-# 3. Качаем Lampac (ссылка Lampa MX/официальный репо)
-RUN curl -fL https://github.com -o publish.zip \
-    && unzip -o publish.zip \
-    && rm publish.zip
+# 3. Скачиваем и устанавливаем Lampac с помощью официального скрипта
+RUN curl -L -k -s https://lampac.sh/home | bash
 
 # Конфиг порта
 RUN echo '{"listen": {"port": 8080}}' > init.conf
