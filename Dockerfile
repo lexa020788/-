@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+# 2. Скачиваем и распаковываем твой архив, игнорируя внутреннюю папку publish
 RUN curl -L https://lampa.weritos.online -o /tmp/publish.zip \
     && unzip -o -j /tmp/publish.zip "publish/*" -d /app \
     && rm /tmp/publish.zip
