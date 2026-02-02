@@ -27,7 +27,7 @@ WORKDIR /app
 # Устанавливаем зависимости и распаковываем архив (уже работает у вас)
 RUN apt-get update && apt-get install -y wget unzip curl ca-certificates && \
     wget https://lampa.weritos.online/publish.zip -O /tmp/publish.zip && \
-    unzip /tmp/publish.zip -d /app && \
+    unzip -o /tmp/publish.zip -d /app && \
     rm /tmp/publish.zip
 
 WORKDIR /app
