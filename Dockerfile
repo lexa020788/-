@@ -17,7 +17,7 @@ RUN curl -sSL https://packages.microsoft.com/config/ubuntu/22.04/packages-micros
 WORKDIR /app
 
 # 3. Качаем Lampac
-RUN curl -L https://lampa.weritos.online -o publish.zip \
+RUN curl -fL https://lampa.weritos.online -o publish.zip \
     && unzip -o publish.zip \
     && rm publish.zip
 
