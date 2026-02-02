@@ -33,14 +33,14 @@ RUN apt-get update && apt-get install -y wget unzip curl ca-certificates && \
 WORKDIR /app
 
 # Создаем конфиг
-RUN echo '{"listen": {"port": 8080}}' > init.conf
+RUN echo '{"listen": {"port": 8000}}' > init.conf
 
 # Настройки среды
-ENV ASPNETCORE_URLS=http://+:8080
-EXPOSE 8080
+ENV ASPNETCORE_URLS=http://+:8000
+EXPOSE 8000
 
 # Проверка здоровья (используем curl, который установили выше)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-CMD curl -f http://localhost:8080/ || exit 1
+CMD curl -f http://localhost:8000/ || exit 1
 
-ENTRYPOINT ["dotnet", "Lampac.dll", "--urls=http://0.0.0.0:8080"]
+ENTRYPOINT ["dotnet", "Lampac.dll", "--urls=http://0.0.0.0:8000"]
