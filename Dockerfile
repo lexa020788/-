@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y wget unzip \
     && rm /tmp/publish.zip \
     && apt-get purge -y wget unzip && apt-get autoremove -y
 
+ENV PATH="/usr/lib/dotnet:$PATH"
+
 # ... (весь остальной код выше остается как был, с исправленной ссылкой на .zip)
 
 WORKDIR /app
