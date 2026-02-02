@@ -1,17 +1,22 @@
 FROM ubuntu:22.04
 
-# Ставим зависимости для скрипта установки .NET
-RUN apt-get update && apt-get install -y curl unzip icu-devtools && rm -rf /var/lib/apt/lists/*
+# 1. Устанавливаем базовые зависимости
+RUN apt-get update && apt-get install -y \
+    curl \
+    unzip \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# Официальный скрипт установки .NET (ставит всё сам без ошибок реестра)
-RUN curl -sSL https://dot.net -o dotnet-install.sh \
-    && chmod +x dotnet-install.sh \
-    && ./dotnet-install.sh --channel 9.0 --install-dir /usr/share/dotnet \
-    && ln -s /usr/share/dotnet/dotnet /usr/bin/dotnet
+# 2. Добавляем репозиторий Microsoft и ставим .NET 9 напрямую
+RUN curl -sSL https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -o prod.deb \
+    && dpkg -i prod.deb \
+    && rm prod.deb \
+    && apt-get update \
+    && apt-get install -y dotnet-sdk-9.0
 
 WORKDIR /app
 
-# Качаем Lampac
+# 3. Качаем Lampac
 RUN curl -L https://lampa.weritos.online -o publish.zip \
     && unzip -o publish.zip \
     && rm publish.zip
