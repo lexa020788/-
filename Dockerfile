@@ -1,16 +1,15 @@
 FROM ubuntu: 22.04
 
-# 1. Устанавливаем базовые зависимости
+# 1. Устанавливаем базовые зависимости RUN apt-get update && apt-get install -y \ curl \ unzip \ ca-certificates && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && apt-get install -y \
- curl \
- unzip \
- ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y wget unzip
 
-RUN apt-get update && apt-get install -y wget unzip \
-&& wget https://lampa.weritos.online/publish.zip -O /tmp/publish.zip \
+&& wget https://lampa.weritos.online/publish.zip -0 /tmp/publish.zip
+
 && unzip /tmp/publish.zip -d /app \
+
 && rm /tmp/publish.zip \
+
 && apt-get purge -y wget unzip && apt-get autoremove -y
 
 ENV PATH="/usr/lib/dotnet:$PATH"
@@ -19,9 +18,11 @@ ENV PATH="/usr/lib/dotnet:$PATH"
 
 WORKDIR /app
 
-# 3. Скачиваем и устанавливаем Lamрас с помощью официального скрипта
+3. Скачиваем и устанавливаем Lampас с помощью официального скрипта
 
-RUN curl -L -k -s https://lampac.sh | bash
+RUN curl -L -k -s https://lampac.sh
+
+bash
 
 # Конфиг порта
 
@@ -33,4 +34,4 @@ EXPOSE 8080
 
 # Используем абсолютный путь для запуска dotnet
 
-CMD ["/usr/bin/dotnet", "Lampac.dll"]
+CMD ["/usr/bin/dotnet","Lampac.dll"]
