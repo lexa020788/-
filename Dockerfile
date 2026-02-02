@@ -7,8 +7,8 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -L https://lampa.weritos.online/publish.zip -o /tmp/publish.zip \
-    && unzip -o /tmp/publish.zip -d /app \
+RUN curl -L https://lampa.weritos.online -o /tmp/publish.zip \
+    && unzip -o -j /tmp/publish.zip "publish/*" -d /app \
     && rm /tmp/publish.zip
 
 WORKDIR /app
