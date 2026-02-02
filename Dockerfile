@@ -43,5 +43,6 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:8080/ || exit 1
 
-ENTRYPOINT ["./Lampac"]
+ENTRYPOINT ["sh", "-c", "dotnet $(find . -maxdepth 1 -iname 'lampac.dll' | head -n 1)"]
+
 
