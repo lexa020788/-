@@ -15,17 +15,17 @@ RUN apt-get update && apt-get install -y wget unzip \
 
 # ... (остальной код остается без изменений)
 
+# ... (весь остальной код выше остается как был)
+
 ENV PATH="/usr/lib/dotnet:$PATH"
-# WORKDIR /app  <-- Закомментируйте или удалите эту строку
-# ...
 
-# Убедитесь, что dotnet runtime установлен выше в Dockerfile (например, apt-get install -y dotnet-runtime-6.0)
+WORKDIR /app
 
-# Изменяем рабочую директорию на ту, куда устанавливается Lampac
-WORKDIR /home/lampac
-
-# 3. Скачиваем и устанавливаем Lampac с помощью официального скрипта
+# 3. Скачиваем и устанавливаем Lampac с помощью официального скрипта (устанавливает в /home/lampac)
 RUN curl -L -k -s https://lampac.sh | bash
+
+# Перемещаем все файлы из директории установки (/home/lampac) в рабочую директорию (/app)
+RUN mv /home/lampac/* /app/
 
 # Конфиг порта
 RUN echo '{"listen": {"port": 8080}}' > init.conf
@@ -33,5 +33,5 @@ RUN echo '{"listen": {"port": 8080}}' > init.conf
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
-# 4. Используем относительный путь для запуска dotnet (предполагая, что dotnet в PATH)
+# 4. Используем относительный путь для запуска dotnet (так как файлы теперь в /app)
 CMD ["dotnet", "Lampac.dll"]
