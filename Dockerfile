@@ -1,4 +1,4 @@
-FROM ://mcr.microsoft.com
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
 
 
 # 1. Устанавливаем базовые зависимости
