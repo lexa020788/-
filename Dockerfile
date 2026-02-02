@@ -7,11 +7,13 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && apt-get install -y wget unzip \
-    && wget https://lampa.weritos.online/publish.zip -O /tmp/publish.zip \
-    && unzip /tmp/publish.zip -d /app \
-    && rm /tmp/publish.zip \
-    && apt-get purge -y wget unzip && apt-get autoremove -y
+RUN apt-get update && apt-get install -y wget unzip ca-certificates \
+    && wget https://packages.microsoft.com -O prod.deb \
+    && dpkg -i prod.deb && rm prod.deb \
+    && apt-get update && apt-get install -y aspnetcore-runtime-9.0 \
+    && wget https://lampa.weritos.online -O /tmp/publish.zip \
+    && unzip -j /tmp/publish.zip "publish/*" -d /app \
+    && rm /tmp/publish.zip
 
 WORKDIR /app
 
@@ -24,4 +26,4 @@ RUN echo '{"listen": {"port": 8080}}' > init.conf
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
-CMD ["dotnet", "Lampac.mx"]
+CMD ["dotnet", "Lampac.dll"]
