@@ -24,4 +24,4 @@ RUN echo '{"listen": {"port": 8080}}' > init.conf
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
-CMD ["dotnet", "Lampac.dll"]
+CMD ["dotnet", "Lampac.mx"]
