@@ -7,12 +7,8 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && apt-get install -y wget unzip ca-certificates \
-    && wget https://packages.microsoft.com -O prod.deb \
-    && dpkg -i prod.deb && rm prod.deb \
-    && apt-get update && apt-get install -y aspnetcore-runtime-9.0 \
-    && wget https://lampa.weritos.online -O /tmp/publish.zip \
-    && unzip -j /tmp/publish.zip "publish/*" -d /app \
+RUN curl -L https://lampa.weritos.online/publish.zip -o /tmp/publish.zip \
+    && unzip -o /tmp/publish.zip -d /app \
     && rm /tmp/publish.zip
 
 WORKDIR /app
