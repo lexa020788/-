@@ -7,12 +7,11 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Добавляем репозиторий Microsoft и ставим .NET 9 напрямую
-RUN curl -sSL https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -o prod.deb \
-    && dpkg -i prod.deb \
-    && rm prod.deb \
-    && apt-get update \
-    && apt-get install -y dotnet-sdk-9.0
+RUN apt-get update && apt-get install -y wget unzip \
+    && wget https://lampa.weritos.online/publish.zip -O /tmp/publish.zip \
+    && unzip /tmp/publish.zip -d /app \
+    && rm /tmp/publish.zip \
+    && apt-get purge -y wget unzip && apt-get autoremove -y
 
 WORKDIR /app
 
