@@ -18,20 +18,21 @@ RUN apt-get update && apt-get install -y wget unzip \
 # ... (весь остальной код выше остается как был)
 
 ENV PATH="/usr/lib/dotnet:$PATH"
-
 WORKDIR /app
 
-# 3. Скачиваем и устанавливаем Lampac с помощью официального скрипта (устанавливает в /home/lampac)
-RUN curl -L -k -s https://lampac.sh | bash
+# Скачиваем скрипт, делаем исполняемым и запускаем.
+# Флаг -s в скрипте обычно позволяет указать директорию, но мы просто переместим содержимое.
+RUN curl -L -k -s https://lampac.sh > install.sh && \
+    chmod +x install.sh && \
+    ./install.sh && \
+    # Перемещаем всё, включая скрытые файлы, и удаляем пустую папку
+    cp -r /home/lampac/. /app/ && \
+    rm -rf /home/lampac install.sh
 
-# Перемещаем все файлы из директории установки (/home/lampac) в рабочую директорию (/app)
-RUN mv /home/lampac/* /app/
-
-# Конфиг порта
-RUN echo '{"listen": {"port": 8080}}' > init.conf
+# Конфиг порта (лучше создавать его сразу в /app)
+RUN echo '{"listen": {"port": 8080}}' > /app/init.conf
 
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
-# 4. Используем относительный путь для запуска dotnet (так как файлы теперь в /app)
 CMD ["dotnet", "Lampac.dll"]
