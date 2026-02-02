@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM mcr.microsoft.com
 
 # 1. Устанавливаем базовые зависимости
 RUN apt-get update && apt-get install -y \
