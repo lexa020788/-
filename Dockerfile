@@ -18,7 +18,6 @@ RUN apt-get update && apt-get install -y wget unzip \
 
 # ... (весь остальной код выше остается как был)
 
-ENV PATH="/usr/lib/dotnet:$PATH"
 WORKDIR /app
 
 # Скачиваем скрипт, делаем исполняемым и запускаем.
@@ -42,6 +41,6 @@ EXPOSE 8080
 
 # Проверка здоровья (используем curl, который установили выше)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:8080/ || exit 1
+CMD curl -f http://localhost:8080/ || exit 1
 
 ENTRYPOINT ["dotnet", "Lampac.dll", "--urls=http://0.0.0.0:8080"]
