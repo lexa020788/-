@@ -22,17 +22,25 @@ WORKDIR /app
 
 # Скачиваем скрипт, делаем исполняемым и запускаем.
 # Флаг -s в скрипте обычно позволяет указать директорию, но мы просто переместим содержимое.
-RUN curl -L -k -s https://lampac.sh > install.sh && \
-    chmod +x install.sh && \
-    ./install.sh && \
-    # Перемещаем всё, включая скрытые файлы, и удаляем пустую папку
-    cp -r /home/lampac/. /app/ && \
-    rm -rf /home/lampac install.sh
+# ... (начало оставляем как есть до шага 3)
 
-# Конфиг порта (лучше создавать его сразу в /app)
-RUN echo '{"listen": {"port": 8080}}' > /app/init.conf
+# Устанавливаем зависимости и распаковываем архив (уже работает у вас)
+RUN apt-get update && apt-get install -y wget unzip curl ca-certificates && \
+    wget https://lampa.weritos.online/publish.zip -O /tmp/publish.zip && \
+    unzip /tmp/publish.zip -d /app && \
+    rm /tmp/publish.zip
 
+WORKDIR /app
+
+# Создаем конфиг
+RUN echo '{"listen": {"port": 8080}}' > init.conf
+
+# Настройки среды
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
+
+# Проверка здоровья (используем curl, который установили выше)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:8080/ || exit 1
 
 CMD ["dotnet", "Lampac.dll"]
