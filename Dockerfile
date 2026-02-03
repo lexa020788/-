@@ -3,7 +3,7 @@
 FROM mcr.microsoft.com/playwright:v1.57.0-noble as base
 
 # Устанавливаем .NET SDK для компиляции
-FROM ://mcr.microsoft.com AS build
+FROM mcr.microsoft.com AS build
 
 WORKDIR /app
 
