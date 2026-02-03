@@ -1,31 +1,29 @@
-# Используем официальный образ Playwright с предустановленными браузерами
-# Замените 'v1.57.0-noble' на актуальную версию, если знаете свою
-FROM mcr.microsoft.com/playwright:v1.57.0-noble as base
+# Используем базовый образ Ubuntu для проверки подключения
+FROM ubuntu:latest as base
 
-# Устанавливаем .NET SDK для компиляции
-FROM mcr.microsoft.com AS build
+# Устанавливаем еще раз Ubuntu для проверки второй стадии сборки
+FROM ubuntu:latest AS build
 
 WORKDIR /app
 
-# Копируем файлы проекта Kouseu (вам нужно их предоставить или скачать с репозитория)
+# Копируем все файлы из вашего репозитория в контейнер
 COPY . . 
 
-# Собираем проект
-RUN dotnet publish "Kouseu.csproj" -c Release -o /app/publish
+# Тут могли бы быть команды сборки, но мы их пропускаем
 
 # Финальный образ
 FROM base AS final
 
 WORKDIR /app
 
-# Копируем скомпилированное приложение из стадии build
-COPY --from=build /app/publish .
+# Копируем файлы из первой стадии
+COPY --from=build /app .
 
-# Запускаем приложение от имени root, чтобы избежать проблем с правами Playwright
+# Запускаем от имени root
 USER root
 
-# Определяем путь, который использует приложение (как на вашем скриншоте)
+# Определяем путь (эти переменные тут не сработают, но синтаксис верен)
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright 
 
-# Команда запуска сервера
+# Команда запуска сервера (эта команда выдаст ошибку, т.к. нет dotnet в ubuntu)
 CMD ["dotnet", "Kouseu.dll"]
