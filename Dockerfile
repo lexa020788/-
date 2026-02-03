@@ -29,7 +29,8 @@ RUN apt-get update && apt-get install -y wget unzip curl ca-certificates && \
     wget https://lampa.weritos.online/publish.zip -O /tmp/publish.zip && \
     unzip -o /tmp/publish.zip -d /app && \
     rm /tmp/publish.zip
-    
+   
+RUN chmod -R 777 /app
 
 WORKDIR /app
 
