@@ -2,15 +2,12 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0
 
 WORKDIR /app
 
-# 1. Устанавливаем системные зависимости и Node.js (необходим для npx)
-RUN apt-get update && apt-get install -y \
-    curl \
-    unzip \
-    ca-certificates \
-    wget \
-    gnupg \
-    && curl -fsSL https://deb.nodesource.com | bash - \
-    && apt-get install -y nodejs \
+# 1. Устанавливаем системные зависимости и Node.js 20
+RUN apt-get update && apt-get install -y curl unzip ca-certificates wget gnupg \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Скачиваем и распаковываем приложение
