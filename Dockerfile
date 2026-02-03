@@ -30,19 +30,6 @@ RUN apt-get update && apt-get install -y wget unzip curl ca-certificates && \
     unzip -o /tmp/publish.zip -d /app && \
     rm /tmp/publish.zip
     
-# Устанавливаем Node.js и npm (необходимы для установщика Playwright CLI)
-RUN apt-get update && apt-get install -y nodejs npm && \
-    npm install -g npm 
-
-# Устанавливаем глобальный Playwright CLI
-RUN npm install -g playwright-cli
-
-# Устанавливаем все браузеры (Chromium, Firefox, WebKit) вместе с системными зависимостями
-# Это гарантирует, что все apt-пакеты будут установлены
-RUN playwright install --with-deps
-
-# Очищаем кэш apt для уменьшения размера образа
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
