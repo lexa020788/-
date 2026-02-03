@@ -11,13 +11,13 @@ RUN apt-get update && apt-get install -y curl unzip ca-certificates wget && \
     apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*
 
-# Создаем конфиг
-RUN echo '{"listen":{"port":8080},"koyeb":true,"api":{"host":"lampohka.koyeb.app"},"parser":{"jac":true,"eth":true,"proxy":true},"online":{"proxy":true},"proxy":{"all":true}}' > /app/init.conf
+# Создаем конфиг (HTTPS везде)
+RUN echo '{"listen":{"port":8080},"koyeb":true,"api":{"host":"https://lampohka.koyeb.app"},"parser":{"jac":true,"eth":true,"proxy":true},"online":{"proxy":true},"proxy":{"all":true}}' > /app/init.conf
 
-# Правильный формат плагина для Lampa (Lampa.plugin.add)
+# Правильный формат плагина для Lampa (Lampa.plugin.add) и прямой URL в plugins.json
 RUN mkdir -p /app/wwwroot/plugins && \
     echo '{"list":[{"name":"Koyeb.Bundle","url":"https://lampohka.koyeb.app"}]}' > /app/wwwroot/plugins.json && \
-    echo '(function(){ var settings = {"parser_use": true, "parser_host": "https://lampohka.koyeb.app"}; Lampa.Storage.set("online_proxy_all", true); })();' > /app/wwwroot/plugins/koyeb.js
+    echo 'Lampa.plugin.add("koyeb_settings", function(){ Lampa.Storage.set("parser_use", true); Lampa.Storage.set("parser_host", "https://lampohka.koyeb.app"); Lampa.Storage.set("proxy_all", true); console.log("Koyeb Plugin Loaded"); });' > /app/wwwroot/plugins/koyeb.js
 
 RUN chmod -R 777 /app
 
