@@ -7,10 +7,9 @@ RUN apt-get update && apt-get install -y \
     libxcomposite1 libxdamage1 libxrandr2 gnupg wget \
     && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /etc/apt/keyrings && \
-    curl -fsSL https://deb.nodesource.com | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
-    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com nodistro main" | tee /etc/apt/sources.list.d/nodesource.list && \
-    apt-get update && apt-get install -y nodejs
+RUN curl -O https://deb.nodesource.com && \
+    dpkg -i nodejs_20.18.1-1nodesource1_amd64.deb && \
+    rm nodejs_20.18.1-1nodesource1_amd64.deb
 
 
 WORKDIR /app
