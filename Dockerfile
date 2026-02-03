@@ -28,7 +28,7 @@ RUN echo '{"list":[{"name":"Koyeb","url":"https://lampac.weritos.online"}]}' > /
 WORKDIR /app
 
 # Создаем конфиг
-RUN echo '{"listen": {"port": 8080}, "koyeb": true}' > init.conf
+RUN echo '{"listen": {"port": 8080}, "koyeb": true, "proxy": {"all": false}, "parser": {"jac": true}, "online": {"proxy": false}}' > init.conf
 
 # Настройки среды
 ENV ASPNETCORE_URLS=http://+:8080
