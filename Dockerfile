@@ -36,7 +36,7 @@ WORKDIR /app
 RUN echo '{"listen": {"port": 8080}}' > init.conf
 
 # Настройки среды
-ENV ASPNETCORE_URLS=http://+:8000
+ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
 # Проверка здоровья (используем curl, который установили выше)
