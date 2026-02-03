@@ -1,40 +1,41 @@
-# СТЕНД 1: node-env (используется только для копирования бинарников Node.js)
-FROM node:20-bookworm-slim AS node-env
+FROM mcr.microsoft.com/dotnet/aspnet:9.0
 
-# СТЕНД 2: base (ваш целевой образ .NET 9.0 ASP.NET)
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
+# 1. Устанавливаем базовые зависимости
+RUN apt-get update && apt-get install -y \
+    curl \
+    unzip \
+    ca-certificates \
+&& rm -rf /var/lib/apt/lists/*
 
-# Устанавливаем системные зависимости, перечисленные в исходном скрипте, через apt-get install
-# Убедитесь, что пользователь имеет права root для установки системных пакетов
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    librss3-dev libgtk-3-dev libxss-dev libasound2 \
-    unzip curl libicu-dev libgdk-pixbuf2.0-dev libospr4 \
-    libatk1.0-0 xvfb coreutils liboss3 libatk-bridge2.0-0 \
-    libdrm-dev libxkbcommon-dev libxcomposite-dev libxdamage-dev \
-    libxrandr-dev libgbm-dev libasound2-dev libpangocairo-1-0-0 \
-    libpango-1.0-0 libcairo2-dev gnupg wget && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y wget unzip \
+&& wget https://lampa.weritos.online/publish.zip -O /tmp/publish.zip \
+&& unzip /tmp/publish.zip -d /app \
+&& rm /tmp/publish.zip \
+&& apt-get purge -y wget unzip && apt-get autoremove -y
 
-# Копируем бинарники Node.js и npm из первого образа во второй
-COPY --from=node-env /usr/local/bin/node /usr/local/bin/node
-COPY --from=node-env /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
-RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
-    ln -s /usr/local/bin/node /usr/bin/node
+WORKDIR /app
 
-# Дальнейшие шаги из вашего скрипта могут быть перенесены сюда вручную:
-# Например, создание папки для приложения, копирование publish.zip и т.д.
-# RUN mkdir -p /home/Lampac
-# WORKDIR /home/Lampac
-# RUN curl -O https://lampa.weritos.online/publish.zip && unzip publish.zip && rm publish.zip
+# Устанавливаем зависимости и распаковываем архив
+RUN apt-get update && apt-get install -y wget unzip curl ca-certificates && \
+    wget https://lampa.weritos.online/publish.zip -O /tmp/publish.zip && \
+    unzip -o /tmp/publish.zip -d /app && \
+    rm /tmp/publish.zip
+   
+RUN chmod -R 777 /app
 
-# Проверка установки
-RUN node -v && npm -v && dotnet --version
+RUN echo '{"list":[{"name":"Koyeb","url":"https://lampac.weritos.online"}]}' > /app/wwwroot/plugins.json
 
-# Ваши финальные ENTRYPOINT / CMD
+WORKDIR /app
 
-**Ключевые изменения:**
-*   **Multi-stage build**: Добавлен первый этап `node-env` для получения Node.js.
-*   **Копирование**: Используются команды `COPY --from=node-env` для переноса файлов Node.js и npm без установки через скрипты.
-*   **Системные зависимости**: Все системные библиотеки устанавливаются через `apt-get install` одной командой, как того требует ваш исходный скрипт, но уже без bash.
+# Создаем конфиг
+RUN echo '{"listen": {"port": 8080}}' > init.conf
 
-Убедитесь, что вы **обновили ваш Dockerfile** в репозитории на этот вариант и запустили билд снова. Сообщите, если возникнут **новые ошибки** после этих изменений.
+# Настройки среды
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
+
+# Проверка здоровья
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+CMD curl -f http://localhost:8080/ || exit 1
+
+ENTRYPOINT ["dotnet", "Lampac.dll", "--urls=http://0.0.0.0:8080"]
