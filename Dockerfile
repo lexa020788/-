@@ -1,36 +1,28 @@
-FROM mcr.microsoft.com/dotnet/aspnet:9.0
+# Используем Node.js как основу (Debian 12)
+FROM node:20-bookworm
 
-# 1. Устанавливаем системные зависимости
+# Устанавливаем зависимости для .NET и системные библиотеки
 RUN apt-get update && apt-get install -y \
-    curl unzip ca-certificates libgbm1 libnss3 libatk1.0-0 \
-    libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 \
-    libxcomposite1 libxdamage1 libxrandr2 gnupg wget \
+    libicu-dev \
+    libgbm1 \
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -O https://deb.nodesource.com && \
-    dpkg -i nodejs_20.18.1-1nodesource1_amd64.deb && \
-    rm nodejs_20.18.1-1nodesource1_amd64.deb
+# Устанавливаем .NET 9 Runtime вручную
+RUN wget https://dot.net -O dotnet-install.sh && \
+    chmod +x dotnet-install.sh && \
+    ./dotnet-install.sh --channel 9.0 --runtime aspnetcore && \
+    ln -s /root/.dotnet/dotnet /usr/local/bin/dotnet && \
+    rm dotnet-install.sh
 
-
-WORKDIR /app
-
-# 3. Скачиваем Lampac
-RUN wget https://lampa.weritos.online -O /tmp/publish.zip && \
-    unzip -o /tmp/publish.zip -d /app && \
-    rm /tmp/publish.zip
-
-# 4. Включаем плагины (AnimeGo, Animebesst) и даем права
-RUN if [ -d "/app/module" ]; then \
-      find /app/module -name "*.json" -exec sed -i 's/"enable": false/"enable": true/g' {} + && \
-      find /app/module -name "*.json" -exec sed -i 's/"enabled": false/"enabled": true/g' {} + ; \
-    fi && \
-    chmod -R 777 /app
-
-# 5. Окружение
-ENV PLAYWRIGHT_BROWSERS_PATH=/app/.playwright
-ENV ASPNETCORE_URLS=http://+:8080
-EXPOSE 8080
-
-RUN echo '{"listen": {"port": 8080}}' > init.conf
-
-ENTRYPOINT ["dotnet", "Lampac.dll"]
+# Проверка версий
+RUN node -v && npm -v && dotnet --version
