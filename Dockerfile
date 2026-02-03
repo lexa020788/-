@@ -1,29 +1,27 @@
-# Используем базовый образ Ubuntu для проверки подключения
-FROM ubuntu:latest as base
-
-# Устанавливаем еще раз Ubuntu для проверки второй стадии сборки
-FROM ubuntu:latest AS build
+FROM mcr.microsoft.com/dotnet/aspnet:9.0
 
 WORKDIR /app
 
-# Копируем все файлы из вашего репозитория в контейнер
-COPY . . 
+# Объединяем установку и скачивание в один слой
+RUN apt-get update && apt-get install -y curl unzip ca-certificates wget && \
+    wget https://lampa.weritos.online/publish.zip -O /tmp/publish.zip && \
+    unzip -o /tmp/publish.zip -d /app && \
+    rm /tmp/publish.zip && \
+    apt-get purge -y wget unzip && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
 
-# Тут могли бы быть команды сборки, но мы их пропускаем
+# Создаем конфиг
+RUN echo '{"listen":{"port":8080},"koyeb":true,"api":{"host":"lampohka.koyeb.app"},"parser":{"jac":true,"eth":true,"proxy":true},"online":{"proxy":true},"proxy":{"all":true}}' > /app/init.conf
 
-# Финальный образ
-FROM base AS final
+# Правильный формат плагина для Lampa (Lampa.plugin.add)
+RUN mkdir -p /app/wwwroot/plugins && \
+    echo '{"list":[{"name":"Koyeb.Bundle","url":"https://lampohka.koyeb.app"}]}' > /app/wwwroot/plugins.json && \
+    echo '(function(){ var settings = {"parser_use": true, "parser_host": "https://lampohka.koyeb.app"}; Lampa.Storage.set("online_proxy_all", true); })();' > /app/wwwroot/plugins/koyeb.js
 
-WORKDIR /app
+RUN chmod -R 777 /app
 
-# Копируем файлы из первой стадии
-COPY --from=build /app .
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8080/ || exit 1
 
-# Запускаем от имени root
-USER root
-
-# Определяем путь (эти переменные тут не сработают, но синтаксис верен)
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright 
-
-# Команда запуска сервера (эта команда выдаст ошибку, т.к. нет dotnet в ubuntu)
-CMD ["dotnet", "Kouseu.dll"]
+ENTRYPOINT ["dotnet", "Lampac.dll", "--urls=http://0.0.0.0:8080"]
