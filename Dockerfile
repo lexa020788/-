@@ -23,20 +23,18 @@ RUN apt-get update && apt-get install -y wget unzip curl ca-certificates && \
    
 RUN chmod -R 777 /app
 
-# ... (ваш код до момента создания конфига остается без изменений)
+# 1. Создаем расширенный конфиг (включаем все встроенные парсеры)
+RUN echo '{"listen":{"port":8080},"koyeb":true,"api":{"host":"lampohka.koyeb.app"},"parser":{"jac":true,"eth":true,"proxy":true},"online":{"proxy":true},"proxy":{"all":true}}' > /app/init.conf
 
-# 1. Исправляем конфиг: включаем встроенный парсер (JAC) и разрешаем работу через прокси Koyeb
-RUN echo '{"listen":{"port":8080},"koyeb":true,"api":{"host":"lampohka.koyeb.app"},"parser":{"jac":true,"eth":true,"proxy":true},"online":{"proxy":true,"component":"app"},"proxy":{"all":true}}' > /app/init.conf
+# 2. Создаем файл плагинов (обязательно в wwwroot)
+RUN mkdir -p /app/wwwroot && echo '{"list":[{"name":"Koyeb.Bundle","url":"http://lampohka.koyeb.app"}]}' > /app/wwwroot/plugins.json
 
-# 2. Генерируем plugins.json (чтобы Lampa видела встроенные дополнения)
-RUN mkdir -p /app/wwwroot && echo '{"list":[{"name":"Koyeb","url":"http://lampohka.koyeb.app"}]}' > /app/wwwroot/plugins.json
-
-# 3. Принудительно ставим права (Koyeb иногда сбрасывает их на папки модулей)
-RUN chmod -R 777 /app
+# 3. Принудительно создаем тот самый koyeb.js, чтобы он отдавал настройки парсеров
+RUN echo 'window.lampa_settings = { "parser_use": true, "parser_host": "http://lampohka.koyeb.app" };' > /app/wwwroot/plugins/koyeb.js
 
 # Настройки среды
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
-# Исправленный ENTRYPOINT для автоматического обновления модулей парсера при старте
+# Запуск с флагом обновления модулей (чтобы докачались DLL источников)
 ENTRYPOINT ["dotnet", "Lampac.dll", "--urls=http://0.0.0.0:8080", "--update=true"]
