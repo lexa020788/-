@@ -2,7 +2,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0
 
 WORKDIR /app
 
-# 1. Устанавливаем системные зависимости и Node.js
+# 1. Устанавливаем системные зависимости
 RUN apt-get update && apt-get install -y \
     curl \
     unzip \
@@ -16,18 +16,20 @@ RUN apt-get update && apt-get install -y \
     libasound2 \
     libxss1 \
     libxtst6 \
-    # Исправленный URL установки Node.js (версия 20)
-    && curl -fsSL https://deb.nodesource.com | bash - \
-    && apt-get install -y nodejs \
-    # 2. Скачиваем приложение (обязательно с /publish.zip на конце)
+    # 2. АКТУАЛЬНЫЙ способ установки Node.js 20 (без битых скриптов)
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update && apt-get install -y nodejs \
+    # 3. Скачиваем приложение (ИСПРАВЛЕНО: прямая ссылка на zip)
     && wget https://lampa.weritos.online -O /tmp/publish.zip \
     && unzip -o /tmp/publish.zip -d /app \
-    # --- ФИКСЫ PLAYWRIGHT И REPOSITORY ---
+    # 4. ФИКСЫ ДЛЯ PLAYWRIGHT И REPOSITORY
     && mkdir -p /app/.playwright/node/linux-x64 \
     && ln -s /usr/bin/node /app/.playwright/node/linux-x64/node \
     && mkdir -p /app/module \
     && echo '{"repositories": []}' > /app/module/repository.yaml \
-    # -------------------------------------
+    # Очистка
     && rm /tmp/publish.zip \
     && apt-get purge -y wget unzip \
     && apt-get autoremove -y \
@@ -42,8 +44,6 @@ RUN mkdir -p /app/wwwroot/plugins && \
     echo 'Lampa.plugin.add("koyeb_settings", function(){ Lampa.Storage.set("parser_use", true); Lampa.Storage.set("parser_host", "https://lampohka.koyeb.app"); Lampa.Storage.set("proxy_all", true); console.log("Koyeb Plugin Loaded"); });' > /app/wwwroot/plugins/koyeb.js
 
 RUN chmod -R 777 /app
-
-ENV NODE_PATH=/usr/lib/node_modules
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8080/ || exit 1
