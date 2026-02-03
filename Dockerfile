@@ -23,7 +23,13 @@ RUN apt-get update && apt-get install -y wget unzip curl ca-certificates && \
    
 RUN chmod -R 777 /app
 
+# Устанавливаем Node.js (нужен для работы npx)
+RUN curl -fsSL https://deb.nodesource.com | bash - && \
+    apt-get install -y nodejs
+
+# Теперь npx будет доступен
 RUN npx playwright install --with-deps
+
 
 # 1. Создаем расширенный конфиг (включаем все встроенные парсеры)
 RUN echo '{"listen":{"port":8080},"koyeb":true,"api":{"host":"lampohka.koyeb.app"},"parser":{"jac":true,"eth":true,"proxy":true},"online":{"proxy":true},"proxy":{"all":true}}' > /app/init.conf
