@@ -28,7 +28,11 @@ RUN echo '{"list":[{"name":"Koyeb","url":"http://lampohka.koyeb.app"}]}' > /app/
 WORKDIR /app
 
 # Создаем конфиг
-RUN echo '{"listen": {"port": 8080}, "koyeb": true, "api": {"host": "lampohka.koyeb.app"}, "online": {"proxy": true}, "parser": {"jac": true}}' > init.conf
+# Исправляем конфиг: включаем парсеры, ставим Koyeb-режим и отключаем проверку SSL для прокси
+RUN echo '{"listen": {"port": 8080}, "koyeb": true, "api": {"host": "lampohka.koyeb.app"}, "parser": {"jac": true, "animego": true}, "online": {"proxy": true}, "cloud": {"node": false}}' > /app/init.conf
+
+# Создаем файл плагинов, который Lampa точно увидит
+RUN mkdir -p /app/wwwroot && echo '{"list":[{"name":"Koyeb","url":"http://lampohka.koyeb.app"}]}' > /app/wwwroot/plugins.json
 
 # Настройки среды
 ENV ASPNETCORE_URLS=http://+:8080
