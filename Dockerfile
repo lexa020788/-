@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y \
 && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && apt-get install -y wget unzip \
-&& wget http://lampohka.koyeb.app/publish.zip -O /tmp/publish.zip \
+&& wget https://lampa.weritos.online/publish.zip -O /tmp/publish.zip \
 && unzip /tmp/publish.zip -d /app \
 && rm /tmp/publish.zip \
 && apt-get purge -y wget unzip && apt-get autoremove -y
@@ -17,7 +17,7 @@ WORKDIR /app
 
 # Устанавливаем зависимости и распаковываем архив
 RUN apt-get update && apt-get install -y wget unzip curl ca-certificates && \
-    wget http://lampohka.koyeb.app/publish.zip -O /tmp/publish.zip && \
+    wget https://lampa.weritos.online/publish.zip -O /tmp/publish.zip && \
     unzip -o /tmp/publish.zip -d /app && \
     rm /tmp/publish.zip
    
@@ -28,7 +28,7 @@ RUN echo '{"list":[{"name":"Koyeb","url":"http://lampohka.koyeb.app"}]}' > /app/
 WORKDIR /app
 
 # Создаем конфиг
-RUN echo '{"listen": {"port": 8080}, "koyeb": true, "proxy": {"all": false}, "parser": {"jac": true}, "online": {"proxy": false}}' > init.conf
+RUN echo '{"listen": {"port": 8080}, "koyeb": true, "api": {"host": "lampohka.koyeb.app"}, "online": {"proxy": true}, "parser": {"jac": true}}' > init.conf
 
 # Настройки среды
 ENV ASPNETCORE_URLS=http://+:8080
