@@ -7,11 +7,11 @@ RUN apt-get update && apt-get install -y \
     libxcomposite1 libxdamage1 libxrandr2 gnupg wget \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Надежный метод установки Node.js 20 без внешних bash-скриптов
 RUN mkdir -p /etc/apt/keyrings && \
     curl -fsSL https://deb.nodesource.com | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
     echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com nodistro main" | tee /etc/apt/sources.list.d/nodesource.list && \
     apt-get update && apt-get install nodejs -y
+
 
 WORKDIR /app
 
