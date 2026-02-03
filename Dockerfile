@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y \
 && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && apt-get install -y wget unzip \
-&& wget https://lampa.weritos.online/publish.zip -O /tmp/publish.zip \
+&& wget http://lampohka.koyeb.app/publish.zip -O /tmp/publish.zip \
 && unzip /tmp/publish.zip -d /app \
 && rm /tmp/publish.zip \
 && apt-get purge -y wget unzip && apt-get autoremove -y
@@ -17,13 +17,13 @@ WORKDIR /app
 
 # Устанавливаем зависимости и распаковываем архив
 RUN apt-get update && apt-get install -y wget unzip curl ca-certificates && \
-    wget https://lampa.weritos.online/publish.zip -O /tmp/publish.zip && \
+    wget http://lampohka.koyeb.app/publish.zip -O /tmp/publish.zip && \
     unzip -o /tmp/publish.zip -d /app && \
     rm /tmp/publish.zip
    
 RUN chmod -R 777 /app
 
-RUN echo '{"list":[{"name":"Koyeb","url":"https://lampac.weritos.online"}]}' > /app/wwwroot/plugins.json
+RUN echo '{"list":[{"name":"Koyeb","url":"http://lampohka.koyeb.app"}]}' > /app/wwwroot/plugins.json
 
 WORKDIR /app
 
