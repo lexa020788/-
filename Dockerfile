@@ -1,48 +1,36 @@
 FROM mcr.microsoft.com/dotnet/aspnet:9.0
 
-# 1. Устанавливаем базовые зависимости
+WORKDIR /app
+
+# 1. Устанавливаем системные зависимости и Node.js (необходим для npx)
 RUN apt-get update && apt-get install -y \
     curl \
     unzip \
     ca-certificates \
-&& rm -rf /var/lib/apt/lists/*
+    wget \
+    gnupg \
+    && curl -fsSL https://deb.nodesource.com | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && apt-get install -y wget unzip \
-&& wget https://lampa.weritos.online/publish.zip -O /tmp/publish.zip \
-&& unzip /tmp/publish.zip -d /app \
-&& rm /tmp/publish.zip \
-&& apt-get purge -y wget unzip && apt-get autoremove -y
+# 2. Скачиваем и распаковываем приложение
+RUN wget https://lampa.weritos.online/publish.zip -O /tmp/publish.zip \
+    && unzip -o /tmp/publish.zip -d /app \
+    && rm /tmp/publish.zip \
+    && chmod -R 777 /app
 
-WORKDIR /app
+# 3. Устанавливаем Playwright и браузеры со всеми системными зависимостями
+RUN npx playwright install --with-deps chromium
 
-# Устанавливаем зависимости и распаковываем архив
-RUN apt-get update && apt-get install -y wget unzip curl ca-certificates && \
-    wget https://lampa.weritos.online/publish.zip -O /tmp/publish.zip && \
-    unzip -o /tmp/publish.zip -d /app && \
-    rm /tmp/publish.zip
-   
-RUN chmod -R 777 /app
-
-# Устанавливаем Node.js (нужен для работы npx)
-RUN curl -fsSL https://deb.nodesource.com | bash - && \
-    apt-get install -y nodejs
-
-# Теперь npx будет доступен
-RUN npx playwright install --with-deps
-
-
-# 1. Создаем расширенный конфиг (включаем все встроенные парсеры)
+# 4. Создаем конфиги
 RUN echo '{"listen":{"port":8080},"koyeb":true,"api":{"host":"lampohka.koyeb.app"},"parser":{"jac":true,"eth":true,"proxy":true},"online":{"proxy":true},"proxy":{"all":true}}' > /app/init.conf
 
-# 2. Создаем файл плагинов (обязательно в wwwroot)
-RUN mkdir -p /app/wwwroot && echo '{"list":[{"name":"Koyeb.Bundle","url":"http://lampohka.koyeb.app"}]}' > /app/wwwroot/plugins.json
+RUN mkdir -p /app/wwwroot/plugins && \
+    echo '{"list":[{"name":"Koyeb.Bundle","url":"http://lampohka.koyeb.app"}]}' > /app/wwwroot/plugins.json && \
+    echo 'window.lampa_settings = { "parser_use": true, "parser_host": "http://lampohka.koyeb.app" };' > /app/wwwroot/plugins/koyeb.js
 
-# 3. Принудительно создаем тот самый koyeb.js, чтобы он отдавал настройки парсеров
-RUN echo 'window.lampa_settings = { "parser_use": true, "parser_host": "http://lampohka.koyeb.app" };' > /app/wwwroot/plugins/koyeb.js
-
-# Настройки среды
+# 5. Настройки среды
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
-# Запуск с флагом обновления модулей (чтобы докачались DLL источников)
 ENTRYPOINT ["dotnet", "Lampac.dll", "--urls=http://0.0.0.0:8080", "--update=true"]
