@@ -25,14 +25,17 @@ RUN chmod -R 777 /app
 
 WORKDIR /app
 
-# Создаем конфиг
-RUN echo '{"listen": {"port": 8080}}' > init.conf
+RUN chmod -R 777 /app
 
-# Настройки среды
-ENV ASPNETCORE_URLS=http://+:8080
-EXPOSE 8080
+# 1. Создаем расширенный конфиг (api host обычно без https, только домен)
+RUN echo '{"listen":{"port":8080},"koyeb":true,"api":{"host":"lampohka.koyeb.app"},"parser":{"jac":true,"eth":true,"proxy":true},"online":{"proxy":true},"proxy":{"all":true}}' > /app/init.conf
 
-# Проверка здоровья
+# 2. Создаем файл списка плагинов (обязательно HTTPS)
+RUN mkdir -p /app/wwwroot && echo '{"list":[{"name":"Koyeb.Bundle","url":"https://lampohka.koyeb.app"}]}' > /app/wwwroot/plugins.json
+
+# 3. Создаем сам плагин настроек (обязательно HTTPS)
+RUN mkdir -p /app/wwwroot/plugins && echo 'window.lampa_settings = { "parser_use": true, "parser_host": "https://lampohka.koyeb.app" };' > /app/wwwroot/plugins/koyeb.js
+
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
 CMD curl -f http://localhost:8080/ || exit 1
 
