@@ -1,23 +1,24 @@
-# Исправлено: чистый путь к образу с указанием платформы
+
 FROM --platform=linux/amd64 mcr.microsoft.com/dotnet/aspnet:9.0
 
-# 1. Системные зависимости (libicu важен для работы плагинов)
+# Устанавливаем ICU (важно для парсеров)
 RUN apt-get update && apt-get install -y \
     curl \
     ca-certificates \
     libicu-dev \
 && rm -rf /var/lib/apt/lists/*
 
+WORKDIR /app
+
 RUN apt-get update && apt-get install -y wget unzip curl ca-certificates && \
     wget https://lampa.weritos.online/publish.zip -O /tmp/publish.zip && \
     unzip -o /tmp/publish.zip -d /app && \
     rm /tmp/publish.zip
-
-WORKDIR /app
-
+    
 RUN chmod -R 777 /app
 
-# 3. Конфиг: домен, прокси и авто-настройка парсера для Lampa
+# 3. КОНФИГ С ЛЕГКИМИ ПЛАГИНАМИ
+# Мы добавили: TMDB (постеры), Online (кино), Torrents (поиск), Lite (скорость)
 RUN echo '{\
   "listen": {"port": 8080},\
   "host": "lampohka.koyeb.app",\
@@ -31,21 +32,23 @@ RUN echo '{\
   },\
   "plugins": [\
     "https://lampohka.koyeb.app",\
+    "https://lampohka.koyeb.app",\
+    "https://lampohka.koyeb.app",\
     "https://lampohka.koyeb.app"\
   ],\
-  "Playwright": {"enable": false}\
+  "Playwright": {"enable": false},\
+  "AnimeGo": {"enable": true, "useproxy": true},\
+  "Animebesst": {"enable": true, "useproxy": true}\
 }' > init.conf
 
-# Ограничение памяти для тарифа Hobby
+# Ограничение аппетитов .NET для Hobby тарифа (512MB)
 ENV DOTNET_GCHeapHardLimit=1C000000 
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
-# Запуск с contentroot
+# 4. ФИНАЛЬНЫЙ ЗАПУСК (с исправлением путей)
 ENTRYPOINT ["dotnet", "Lampac.dll", "--urls=http://0.0.0.0:8080", "--contentroot=/app"]
 
 
-
-    
 
 
