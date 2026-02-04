@@ -2,35 +2,29 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0
 
 WORKDIR /app
 
-# Установка зависимостей
+# 1. Системные зависимости
 RUN apt-get update && apt-get install -y \
     curl unzip ca-certificates wget nodejs npm \
-    libgbm1 libgtk-3-0 libnspr4 libnss3 libasound2
-
-# Скачивание Lampac (ИСПРАВЛЕННЫЙ URL)
-RUN wget https://lampa.weritos.online -O /tmp/publish.zip && \
-    unzip -o /tmp/publish.zip -d /app && \
-    rm /tmp/publish.zip
-
-# Установка Playwright браузера
-RUN npx playwright install chromium --with-deps
-
-# Очистка
-RUN apt-get purge -y wget unzip && \
-    apt-get autoremove -y && \
+    libgbm1 libgtk-3-0 libnspr4 libnss3 libasound2 && \
     rm -rf /var/lib/apt/lists/*
 
-# Конфигурация (относительный путь для плагина)
+# 2. Скачивание Lampac (используем стабильную прямую ссылку)
+ADD https://github.com /tmp/publish.zip
+RUN unzip -o /tmp/publish.zip -d /app && rm /tmp/publish.zip
+
+# 3. Playwright (Hobby план позволяет)
+RUN npx playwright install chromium --with-deps
+
+# 4. Конфиг (Относительные пути, чтобы плагины подтягивались сами)
 RUN echo '{"listen":{"port":8080},"koyeb":true,"parser":{"jac":true,"eth":true,"proxy":true,"playwright":true},"online":{"proxy":true},"proxy":{"all":true},"plugins":[{"name":"Koyeb Bundle","url":"/plugins/koyeb.js"}]}' > /app/init.conf
 
-# Создание плагина
+# 5. Плагин (Авто-настройка Lampa под твой домен)
 RUN mkdir -p /app/wwwroot/plugins && \
     echo 'Lampa.plugin.add("koyeb_bundle", function(){ \
         var host = window.location.protocol + "//" + window.location.host; \
         Lampa.Storage.set("parser_use", "true"); \
         Lampa.Storage.set("parser_host", host); \
         Lampa.Storage.set("proxy_all", "true"); \
-        console.log("Plugin initialized on: " + host); \
     });' > /app/wwwroot/plugins/koyeb.js
 
 RUN chmod -R 777 /app
@@ -38,5 +32,5 @@ RUN chmod -R 777 /app
 HEALTHCHECK --interval=60s --timeout=15s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8080/ || exit 1
 
-# Запуск напрямую через dotnet без лишних оболочек
+# Запуск напрямую
 ENTRYPOINT ["dotnet", "Lampac.dll", "--urls=http://0.0.0.0:8080"]
