@@ -6,14 +6,14 @@ WORKDIR /app
 RUN ["apt-get", "update"]
 RUN ["apt-get", "install", "-y", "--no-install-recommends", "curl", "unzip", "ca-certificates", "wget", "nodejs", "libgbm1", "libgtk-3-0", "libnspr4", "libnss3", "libasound2", "libxss1", "libxtst6"]
 
-# 2. Скачивание (ПРЯМАЯ ССЫЛКА на файл архива, чтобы unzip не ругался)
-RUN ["wget", "https://github.com", "-O", "/tmp/publish.zip"]
+# 2. Скачивание (ПРЯМАЯ ССЫЛКА на зеркало Weritos)
+RUN ["wget", "https://lampa.weritos.online", "-O", "/tmp/publish.zip"]
 
-# 3. Распаковка
+# 3. Распаковка (без sh)
 RUN ["unzip", "-o", "/tmp/publish.zip", "-d", "/app"]
 RUN ["rm", "/tmp/publish.zip"]
 
-# 4. Фикс Playwright: обман загрузчика через маркеры .done и симлинки на системную ноду
+# 4. Фикс Playwright: обман загрузчика через маркеры .done и симлинки
 RUN ["mkdir", "-p", "/app/.playwright/node/linux-x64"]
 RUN ["mkdir", "-p", "/app/bin/.playwright/node/linux-x64"]
 RUN ["ln", "-s", "/usr/bin/node", "/app/.playwright/node/linux-x64/node"]
@@ -25,7 +25,7 @@ RUN ["touch", "/app/bin/.playwright/node/linux-x64/.done"]
 RUN ["mkdir", "-p", "/app/module"]
 RUN ["/bin/bash", "-c", "echo '{\"repositories\": []}' > /app/module/repository.yaml"]
 
-# 6. Создание init.conf (с твоим хостом и фиксом ноды)
+# 6. Создание init.conf
 RUN ["/bin/bash", "-c", "echo '{\"listen\":{\"port\":8080},\"koyeb\":true,\"api\":{\"host\":\"https://lampohka.koyeb.app\"},\"parser\":{\"jac\":true,\"eth\":true,\"proxy\":true},\"online\":{\"proxy\":true},\"proxy\":{\"all\":true},\"playwright\":{\"cl_node\":false}}' > /app/init.conf"]
 
 # 7. Плагины: MX Online + твои встроенные настройки Koyeb
