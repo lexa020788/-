@@ -2,29 +2,32 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0
 
 WORKDIR /app
 
-# 1. Системные зависимости
+# 1. Установка системных зависимостей и Node.js для Playwright
 RUN apt-get update && apt-get install -y \
     curl unzip ca-certificates wget nodejs npm \
     libgbm1 libgtk-3-0 libnspr4 libnss3 libasound2 && \
     rm -rf /var/lib/apt/lists/*
 
-# 2. Скачивание Lampac (используем стабильную прямую ссылку)
-ADD https://github.com /tmp/publish.zip
-RUN unzip -o /tmp/publish.zip -d /app && rm /tmp/publish.zip
+# 2. Скачивание Lampac (ПРЯМАЯ ССЫЛКА НА ZIP)
+# Если эта ссылка не сработает, используем альтернативную
+RUN wget -q https://github.com -O /tmp/publish.zip && \
+    unzip -o /tmp/publish.zip -d /app && \
+    rm /tmp/publish.zip
 
-# 3. Playwright (Hobby план позволяет)
+# 3. Установка Playwright браузеров (для Hobby плана)
 RUN npx playwright install chromium --with-deps
 
-# 4. Конфиг (Относительные пути, чтобы плагины подтягивались сами)
+# 4. Конфиг Lampac (относительный путь для плагина /plugins/koyeb.js)
 RUN echo '{"listen":{"port":8080},"koyeb":true,"parser":{"jac":true,"eth":true,"proxy":true,"playwright":true},"online":{"proxy":true},"proxy":{"all":true},"plugins":[{"name":"Koyeb Bundle","url":"/plugins/koyeb.js"}]}' > /app/init.conf
 
-# 5. Плагин (Авто-настройка Lampa под твой домен)
+# 5. Плагин Lampa (авто-настройка под твой текущий домен)
 RUN mkdir -p /app/wwwroot/plugins && \
     echo 'Lampa.plugin.add("koyeb_bundle", function(){ \
         var host = window.location.protocol + "//" + window.location.host; \
         Lampa.Storage.set("parser_use", "true"); \
         Lampa.Storage.set("parser_host", host); \
         Lampa.Storage.set("proxy_all", "true"); \
+        console.log("Koyeb Plugin Active: " + host); \
     });' > /app/wwwroot/plugins/koyeb.js
 
 RUN chmod -R 777 /app
