@@ -2,31 +2,35 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0
 
 WORKDIR /app
 
-# Максимально простой и надежный билд
+# Установка зависимостей
 RUN apt-get update && apt-get install -y \
     curl unzip ca-certificates wget nodejs npm \
-    libgbm1 libgtk-3-0 libnspr4 libnss3 libasound2 \
-    && wget https://lampa.weritos.online -O /tmp/publish.zip \
-    && unzip -o /tmp/publish.zip -d /app \
-    && rm /tmp/publish.zip \
-    # Установка Playwright и браузера
-    && npx playwright install chromium --with-deps \
-    && apt-get purge -y wget unzip \
-    && apt-get autoremove -y \
-    && rm -rf /var/lib/apt/lists/*
+    libgbm1 libgtk-3-0 libnspr4 libnss3 libasound2
 
-# Конфиг: относительный путь решает проблему конфликтов URL
+# Скачивание Lampac (ИСПРАВЛЕННЫЙ URL)
+RUN wget https://lampa.weritos.online -O /tmp/publish.zip && \
+    unzip -o /tmp/publish.zip -d /app && \
+    rm /tmp/publish.zip
+
+# Установка Playwright браузера
+RUN npx playwright install chromium --with-deps
+
+# Очистка
+RUN apt-get purge -y wget unzip && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
+# Конфигурация (относительный путь для плагина)
 RUN echo '{"listen":{"port":8080},"koyeb":true,"parser":{"jac":true,"eth":true,"proxy":true,"playwright":true},"online":{"proxy":true},"proxy":{"all":true},"plugins":[{"name":"Koyeb Bundle","url":"/plugins/koyeb.js"}]}' > /app/init.conf
 
-# Плагин: динамически подставляет домен koyeb
+# Создание плагина
 RUN mkdir -p /app/wwwroot/plugins && \
     echo 'Lampa.plugin.add("koyeb_bundle", function(){ \
         var host = window.location.protocol + "//" + window.location.host; \
         Lampa.Storage.set("parser_use", "true"); \
         Lampa.Storage.set("parser_host", host); \
         Lampa.Storage.set("proxy_all", "true"); \
-        Lampa.Storage.set("proxy_host", host); \
-        console.log("Koyeb Plugin Configured for: " + host); \
+        console.log("Plugin initialized on: " + host); \
     });' > /app/wwwroot/plugins/koyeb.js
 
 RUN chmod -R 777 /app
@@ -34,4 +38,5 @@ RUN chmod -R 777 /app
 HEALTHCHECK --interval=60s --timeout=15s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8080/ || exit 1
 
+# Запуск напрямую через dotnet без лишних оболочек
 ENTRYPOINT ["dotnet", "Lampac.dll", "--urls=http://0.0.0.0:8080"]
