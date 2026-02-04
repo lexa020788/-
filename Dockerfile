@@ -9,13 +9,18 @@ RUN apt-get update && apt-get install -y \
 
 # Ваш блок без изменений (исправлен только путь к .zip для wget)
 RUN apt-get update && apt-get install -y wget unzip \
-&& wget https://lampa.weritos.online -O /tmp/publish.zip \
+&& wget https://lampa.weritos.online/publish.zip -O /tmp/publish.zip \
 && unzip /tmp/publish.zip -d /app \
 && rm /tmp/publish.zip \
 && apt-get purge -y wget unzip && apt-get autoremove -y
 
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y wget unzip curl ca-certificates && \
+    wget https://lampa.weritos.online/publish.zip -O /tmp/publish.zip && \
+    unzip -o /tmp/publish.zip -d /app && \
+    rm /tmp/publish.zip
+    
 RUN chmod -R 777 /app
 
 # Создаем конфиг с вашим доменом и парсерами
