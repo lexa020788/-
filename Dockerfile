@@ -24,15 +24,20 @@ RUN apt-get update && apt-get install -y wget unzip curl ca-certificates && \
 RUN chmod -R 777 /app
 
 # Создаем конфиг с вашим доменом и парсерами
+# Создаем правильный конфиг
 RUN echo '{\
   "listen": {"port": 8080},\
   "host": "lampohka.koyeb.app",\
-  "proxy": {"psearch": true},\
+  "serverproxy": {"enable": true},\
+  "proxy": {"psearch": true, "all": true},\
   "jac": {"enable": true},\
   "plugins": [\
     "https://lampohka.koyeb.app",\
     "https://lampohka.koyeb.app"\
-  ]\
+  ],\
+  "Animebesst": {"enable": true, "useproxy": true, "stream_access": "apk,cors,web"},\
+  "AnimeGo": {"enable": true, "useproxy": true, "streamproxy": true},\
+  "Playwright": {"enable": false}\
 }' > init.conf
 
 # Настройки среды
