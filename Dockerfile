@@ -8,19 +8,12 @@ RUN apt-get update && apt-get install -y \
     libicu-dev \
 && rm -rf /var/lib/apt/lists/*
 
-# 2. Твой блок (исправлена только ссылка на .zip)
-RUN apt-get update && apt-get install -y wget unzip \
-&& wget https://lampa.weritos.online -O /tmp/publish.zip \
-&& unzip -o /tmp/publish.zip -d /app \
-&& rm /tmp/publish.zip \
-&& apt-get purge -y wget unzip && apt-get autoremove -y
-
-WORKDIR /app
-
 RUN apt-get update && apt-get install -y wget unzip curl ca-certificates && \
     wget https://lampa.weritos.online/publish.zip -O /tmp/publish.zip && \
     unzip -o /tmp/publish.zip -d /app && \
     rm /tmp/publish.zip
+
+WORKDIR /app
 
 RUN chmod -R 777 /app
 
