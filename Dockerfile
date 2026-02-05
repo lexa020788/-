@@ -23,7 +23,16 @@ RUN echo '{\
   "listen": {"port": 8080},\
   "host": "lampohka.koyeb.app",\
   "proxy": {"psearch": true, "all": true},\
-  "jac": {"enable": true},\
+  "jac": {\
+    "enable": true,\
+    "apikey": "123",\
+    "items": [\
+      { "name": "rutracker", "enable": true },\
+      { "name": "kinozal", "enable": true },\
+      { "name": "rutor", "enable": true },\
+      { "name": "nnmclub", "enable": true }\
+    ]\
+  },\
   "LampaWeb": {\
     "init": {\
       "parser_use": true,\
@@ -31,12 +40,11 @@ RUN echo '{\
     }\
   },\
   "plugins": [\
-    "https://lampohka.koyeb.app",\
-    "https://lampohka.koyeb.app",\
-    "https://lampohka.koyeb.app",\
-    "https://lampohka.koyeb.app"\
+    "https://nb99.github.io",\
+    "https://nb99.github.io",\
+    "https://bwa.to"\
   ],\
-  "Playwright": {"enable": false},\
+  "Playwright": {"enable": true},\
   "AnimeGo": {"enable": true, "useproxy": true},\
   "Animebesst": {"enable": true, "useproxy": true}\
 }' > init.conf
