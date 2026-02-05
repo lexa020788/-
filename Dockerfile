@@ -1,36 +1,36 @@
-# Стейдж 1: Скачиваем TorrServer
-FROM alpine:latest AS downloader
-RUN apk add --no-cache curl
-RUN curl -L -o /torrserver https://github.com
-RUN chmod +x /torrserver
+# Стейдж 1: Подготовка TorrServer и Lampac
+FROM alpine:latest AS fetcher
+RUN apk add --no-cache curl unzip
 
-# Стейдж 2: Основное приложение (Lampac)
-FROM node:20.18.0-slim
+# Скачиваем TorrServer
+RUN curl -L -o /torrserver https://github.com && \
+    chmod +x /torrserver
 
+# Скачиваем Lampac (скомпилированную версию)
+RUN curl -L -o /app.zip https://github.com && \
+    mkdir /lampac && unzip /app.zip -d /lampac
+
+# Стейдж 2: Финальный образ
+FROM node:20-slim
 WORKDIR /app
 
-# Устанавливаем системные зависимости
-RUN apt-get update && apt-get install -y ffmpeg curl && rm -rf /var/lib/apt/lists/*
+# Устанавливаем ffmpeg для работы видео-движков
+RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 
-# Копируем TorrServer
-COPY --from=downloader /torrserver /usr/bin/torrserver
-
-# Копируем файлы проекта
-COPY package.json yarn.lock* ./
-RUN yarn install --production --frozen-lockfile
-COPY . .
+# Копируем всё из первого стейджа
+COPY --from=fetcher /torrserver /usr/bin/torrserver
+COPY --from=fetcher /lampac ./
 
 # Настройки портов
 ENV PORT=8080
-ENV NODE_ENV=production
 ENV TS_PORT=8090
 EXPOSE 8080
 EXPOSE 8090
 
-# Скрипт запуска двух сервисов сразу
+# Создаем скрипт запуска
 RUN echo '#!/bin/sh\n\
 /usr/bin/torrserver -p 8090 -d /app/db &\n\
-node server.js\n\
+node index.js\n\
 ' > /app/start.sh && chmod +x /app/start.sh
 
 CMD ["/app/start.sh"]
