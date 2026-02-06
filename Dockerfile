@@ -22,7 +22,7 @@ RUN chmod -R 777 /app
 # 3. КОНФИГ С ЛЕГКИМИ ПЛАГИНАМИ
 # Мы добавили: TMDB (постеры), Online (кино), Torrents (поиск), Lite (скорость)
 RUN echo '{\
-  "listen": {"port": 8080},\
+  "listen": {"port": 8080, "frontend": "cloudflare"},\
   "host": "lampohka.koyeb.app",\
   "proxy": {"psearch": true, "all": true},\
   "jac": {\
@@ -43,12 +43,11 @@ RUN echo '{\
   },\
   "plugins": [\
     "https://nb99.github.io",\
-    "https://nb99.github.io",\
     "https://bwa.to"\
   ],\
-  "Playwright": {"enable": true},\
-  "AnimeGo": {"enable": true, "useproxy": true},\
-  "Animebesst": {"enable": true, "useproxy": true}\
+  "Playwright": {"enable": false},\
+  "AnimeGo": {"enable": true, "useproxy": true, "host": "https://animego.me"},\
+  "Animebesst": {"enable": true, "useproxy": true, "host": "https://anime1.best"}\
 }' > init.conf
 
 # Ограничение аппетитов .NET для Hobby тарифа (512MB)
