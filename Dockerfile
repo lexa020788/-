@@ -1,23 +1,22 @@
-# 1. Используем официальный образ
+# 1. AMD64 оригинал
 FROM --platform=linux/amd64 ghcr.io/lampac-talks/lampac:amd64
 
-# Устанавливаем зависимости
+# Системные зависимости
 RUN apt-get update && apt-get install -y \
     curl \
     ca-certificates \
     libicu-dev \
 && rm -rf /var/lib/apt/lists/*
 
-# Устанавливаем рабочую директорию (ВАЖНО)
-WORKDIR /app
+WORKDIR /
 
-# 2. Настраиваем репозиторий плагинов (путь /app/module)
-RUN mkdir -p /app/module && \
-    echo 'repositories:\n  - name: "Lampac"\n    url: "https://lampac.sh"' > /app/module/repository.yaml
+# 2. Плагины
+RUN mkdir -p module && \
+    echo 'repositories:\n  - name: "Lampac"\n    url: "https://lampac.sh"' > module/repository.yaml
 
-# 3. Создаем init.conf в рабочей директории /app/
+# 3. Конфиг (под Koyeb порт 8080)
 RUN echo '{\
-  "listenport": 9120, \
+  "listenport": 8080, \
   "dlna": { "downloadSpeed": 25000000 },\
   "Rezka": { "streamproxy": true },\
   "Zetflix": {\
@@ -39,16 +38,16 @@ RUN echo '{\
   "overrideResponse": [\
     { "pattern": "/msx/start.json", "action": "file", "type": "application/json; charset=utf-8", "val": "myfile.json" }\
   ]\
-}' > /app/init.conf
+}' > init.conf
 
-# 4. Права доступа
-RUN chmod -R 777 /app
+RUN chmod -R 777 /
 
-# Настройки среды
+# Настройки среды для Koyeb
 ENV DOTNET_GCHeapHardLimit=1C000000 
-ENV ASPNETCORE_URLS=http://+:9120
-EXPOSE 9120
+ENV ASPNETCORE_URLS=http://+:8080
+# Koyeb любит переменную PORT
+ENV PORT=8080 
+EXPOSE 8080
 
-# 5. ИСПРАВЛЕННЫЙ ЗАПУСК
-# Проверяем путь /app/Lampac.dll
-ENTRYPOINT ["dotnet", "Lampac.dll", "--urls", "http://0.0.0.0:9120"]
+# 5. ЗАПУСК
+ENTRYPOINT ["dotnet", "Lampac.dll", "--urls", "http://0.0.0.0:8080"]
