@@ -9,19 +9,14 @@ RUN apt-get update && apt-get install -y \
 && rm -rf /var/lib/apt/lists/*
 
 # Создаем структуру и конфиг репозитория
-RUN mkdir -p /app/module && \
-    echo 'repositories:' > /app/module/repository.yaml && \
-    echo '  - name: "Lampac"' >> /app/module/repository.yaml && \
-    echo '    url: "https://github.com"' >> /app/module/repository.yaml
+RUN mkdir -p /app/module && echo 'repositories: \n  - name: "Lampac" \n    url: "https://lampac.sh"' > /app/module/repository.yaml
 
 WORKDIR /app
 
-# Устанавливаем зависимости, качаем те самые 45 метров и чистим за собой
-RUN apt-get update && apt-get install -y --no-install-recommends wget unzip curl ca-certificates && \
-    wget -q --show-progress -L -O /tmp/publish.zip https://github.com/releases/latest/download/publish.zip && \
+RUN apt-get update && apt-get install -y wget unzip curl ca-certificates && \
+    wget https://lampac.sh/publish.zip -O /tmp/publish.zip && \
     unzip -o /tmp/publish.zip -d /app && \
-    rm /tmp/publish.zip && \
-    rm -rf /var/lib/apt/lists/*
+    rm /tmp/publish.zip
 
 RUN chmod -R 777 /app
 
