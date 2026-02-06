@@ -9,14 +9,15 @@ RUN apt-get update && apt-get install -y \
 && rm -rf /var/lib/apt/lists/*
 
 # Создаем структуру и конфиг репозитория
-RUN mkdir -p /app/module && echo 'repositories: \n  - name: "Lampac" \n    url: "https://lampac.sh"' > /app/module/repository.yaml
+# В конфиг прописываем основной домен
+RUN mkdir -p /app/module && \
+    echo "repositories: \n  - name: \"Lampac Official\" \n    url: \"https://lampac.sh\"" > /app/module/repository.yaml
 
-WORKDIR /app
-
-RUN apt-get update && apt-get install -y wget unzip curl ca-certificates && \
-    wget https://lampac.sh/publish.zip -O /tmp/publish.zip && \
+# Качаем 45 МБ напрямую с этого домена
+RUN wget -L -O /tmp/publish.zip https://lampac.sh && \
     unzip -o /tmp/publish.zip -d /app && \
     rm /tmp/publish.zip
+
 
 RUN chmod -R 777 /app
 
