@@ -8,17 +8,15 @@ RUN apt-get update && apt-get install -y \
     libicu-dev \
 && rm -rf /var/lib/apt/lists/*
 
-# Создаем структуру и конфиг репозитория
-# В конфиг прописываем основной домен
-RUN mkdir -p /app/module && \
-    echo "repositories: \n  - name: \"Lampac Official\" \n    url: \"https://lampac.sh\"" > /app/module/repository.yaml
+RUN mkdir -p /app/module && echo 'repositories: \n  - name: "Lampac" \n    url: "https://github.com/lampac-talks/lampac/pkgs/container/lampac"' > /app/module/repository.yaml
 
-# Качаем 45 МБ напрямую с этого домена
-RUN wget -L -O /tmp/publish.zip https://lampac.sh && \
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y wget unzip curl ca-certificates && \
+    wget https://github.com/lampac-talks/lampac/pkgs/container/lampac/publish.zip -O /tmp/publish.zip && \
     unzip -o /tmp/publish.zip -d /app && \
     rm /tmp/publish.zip
-
-
+    
 RUN chmod -R 777 /app
 
 # 3. КОНФИГ С ЛЕГКИМИ ПЛАГИНАМИ
@@ -59,6 +57,10 @@ EXPOSE 8080
 
 # 4. ФИНАЛЬНЫЙ ЗАПУСК (с исправлением путей)
 ENTRYPOINT ["dotnet", "Lampac.dll", "--urls=http://0.0.0.0:8080", "--contentroot=/app"]
+
+
+
+
 
 
 
