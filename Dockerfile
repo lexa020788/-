@@ -1,7 +1,7 @@
-# 1. Используем официальный образ
-FROM ghcr.io/lampac-talks/lampac:amd64
+# 1. Используем официальный образ (в нем Lampac уже установлен в корень /)
+FROM --platform=linux/amd64 ghcr.io/lampac-talks/lampac:amd64
 
-# Устанавливаем зависимости
+# Устанавливаем зависимости (важно для парсеров и утилит)
 RUN apt-get update && apt-get install -y \
     curl \
     ca-certificates \
@@ -13,44 +13,68 @@ RUN apt-get update && apt-get install -y \
 RUN mkdir -p /module && \
     echo 'repositories:\n  - name: "Lampac"\n    url: "https://lampac.sh"' > /module/repository.yaml
 
-# 3. ТВОЙ КОНФИГ
+# 3. ВАШ НОВЫЙ КОНФИГ init.conf (создаем его в корне /)
 RUN echo '{\
-  "listen": {"port": 8080, "frontend": "cloudflare"},\
-  "host": "lampohka.koyeb.app",\
-  "proxy": {"psearch": true, "all": true},\
-  "jac": {\
-    "enable": true,\
-    "apikey": "123",\
-    "items": [\
-      { "name": "rutracker", "enable": true },\
-      { "name": "kinozal", "enable": true },\
-      { "name": "rutor", "enable": true },\
-      { "name": "nnmclub", "enable": true }\
-    ]\
+  "listenport": 9120, \
+  "dlna": {\
+    "downloadSpeed": 25000000 \
   },\
-  "LampaWeb": {\
-    "init": {\
-      "parser_use": true,\
-      "parser_host": "https://lampohka.koyeb.app"\
+  "Rezka": {\
+    "streamproxy": true \
+  },\
+  "Zetflix": {\
+    "displayname": "Zetflix - 1080p", \
+    "geostreamproxy": ["UA"], \
+    "apn": "http://apn.cfhttp.top"\
+  },\
+  "Kodik": {\
+    "useproxy": true, \
+    "proxy": {\
+      "list": [\
+        "socks5://91.1.1.1:5481", \
+        "91.2.2.2:5481" \
+      ]\
     }\
   },\
-  "plugins": [\
-    "https://nb99.github.io",\
-    "https://bwa.to"\
+  "Ashdi": {\
+    "useproxy": true \
+  },\
+  "Filmix": {\
+    "token": "protoken" \
+  },\
+  "PornHub": {\
+    "enable": false \
+  },\
+  "proxy": {\
+    "list": [\
+      "93.3.3.3:5481"\
+    ]\
+  },\
+  "globalproxy": [\
+    {\
+      "pattern": "\\\\.onion",\
+      "list": [\
+        "socks5://127.0.0.1:9050"\
+      ]\
+    }\
   ],\
-  "Playwright": {"enable": false},\
-  "AnimeGo": {"enable": true, "useproxy": true, "host": "https://animego.me"},\
-  "Animebesst": {"enable": true, "useproxy": true, "host": "https://anime1.best"}\
+  "overrideResponse": [\
+    {\
+      "pattern": "/msx/start.json",\
+      "action": "file",\
+      "type": "application/json; charset=utf-8",\
+      "val": "myfile.json"\
+    }\
+  ]\
 }' > /init.conf
 
-# 4. ПРАВА ДОСТУПА (только на нужные папки)
+# 4. Права доступа (только на нужные папки, чтобы не было ошибки Read-only file system)
 RUN chmod 777 /init.conf && chmod -R 777 /module
 
-# Настройки среды
+# Настройки среды (Обновляем порт на 9120!)
 ENV DOTNET_GCHeapHardLimit=1C000000 
-ENV ASPNETCORE_URLS=http://+:8080
-EXPOSE 8080
+ENV ASPNETCORE_URLS=http://+:9120
+EXPOSE 9120
 
-# 5. ФИНАЛЬНЫЙ ЗАПУСК
-# В образе ghcr.io приложение лежит в корне
-ENTRYPOINT ["dotnet", "/Lampac.dll", "--urls=http://0.0.0.0:8080", "--contentroot=/"]
+# 5. ФИНАЛЬНЫЙ ЗАПУСК (указываем путь от корня, где лежит DLL в этом образе)
+ENTRYPOINT ["dotnet", "/Lampac.dll", "--urls=http://0.0.0.0:9120", "--contentroot=/"]
