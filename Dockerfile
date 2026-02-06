@@ -10,11 +10,11 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /
 
-# 2. Плагины
-RUN mkdir -p module && \
-    echo 'repositories:\n  - name: "Lampac"\n    url: "https://lampac.sh"' > module/repository.yaml
+# 2. Репозиторий плагинов
+RUN mkdir -p /module && \
+    echo 'repositories:\n  - name: "Lampac"\n    url: "https://lampac.sh"' > /module/repository.yaml
 
-# 3. Конфиг (под Koyeb порт 8080)
+# 3. Конфиг под Koyeb (порт 8080)
 RUN echo '{\
   "listenport": 8080, \
   "dlna": { "downloadSpeed": 25000000 },\
@@ -38,14 +38,14 @@ RUN echo '{\
   "overrideResponse": [\
     { "pattern": "/msx/start.json", "action": "file", "type": "application/json; charset=utf-8", "val": "myfile.json" }\
   ]\
-}' > init.conf
+}' > /init.conf
 
-RUN chmod -R 777 /
+# Даем права только на рабочие папки и конфиг, чтобы не злить систему
+RUN chmod -R 777 /init.conf /module
 
-# Настройки среды для Koyeb
+# Настройки среды
 ENV DOTNET_GCHeapHardLimit=1C000000 
 ENV ASPNETCORE_URLS=http://+:8080
-# Koyeb любит переменную PORT
 ENV PORT=8080 
 EXPOSE 8080
 
