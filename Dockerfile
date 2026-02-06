@@ -1,12 +1,9 @@
 FROM --platform=linux/amd64 ghcr.io/lampac-talks/lampac:amd64
 
-# Ставим только самое нужное
+# Ставим зависимости
 RUN apt-get update && apt-get install -y curl ca-certificates libicu-dev && rm -rf /var/lib/apt/lists/*
 
-# Не создаем новые папки, работаем там, где уже есть Лампак
-WORKDIR /
-
-# Создаем конфиг прямо в корне (рядом с бинарником)
+# Создаем конфиг в корне, потом мы его скопируем куда надо
 RUN echo '{\
   "listenport": 8080, \
   "dlna": { "downloadSpeed": 25000000 },\
@@ -30,18 +27,23 @@ RUN echo '{\
   "overrideResponse": [\
     { "pattern": "/msx/start.json", "action": "file", "type": "application/json; charset=utf-8", "val": "myfile.json" }\
   ]\
-}' > init.conf
-
-# Создаем папку модулей
-RUN mkdir -p module && \
-    echo 'repositories:\n  - name: "Lampac"\n    url: "https://lampac.sh"' > module/repository.yaml
-
-# Даем права только на конфиг и модули
-RUN chmod 777 init.conf && chmod -R 777 module
+}' > /init.conf
 
 # Настройки Koyeb
 ENV PORT=8080
 EXPOSE 8080
 
-# ЗАПУСК: Ищем бинарник Lampac и запускаем его напрямую
-ENTRYPOINT ["sh", "-c", "chmod +x ./Lampac 2>/dev/null; ./Lampac --urls http://0.0.0.0:8080"]
+# СУПЕР-ЗАПУСК
+# 1. Находим путь к файлу Lampac
+# 2. Переходим в эту папку (чтобы он видел свои библиотеки)
+# 3. Копируем наш конфиг туда
+# 4. Запускаем
+ENTRYPOINT ["sh", "-c", "\
+    BINARY_PATH=$(find / -name Lampac -type f -executable -not -path '*/.*' | head -n 1); \
+    if [ -z \"$BINARY_PATH\" ]; then BINARY_PATH=$(find / -name Lampac -type f | head -n 1); fi; \
+    echo \"Found binary at: $BINARY_PATH\"; \
+    BINARY_DIR=$(dirname \"$BINARY_PATH\"); \
+    cd \"$BINARY_DIR\"; \
+    cp /init.conf ./init.conf; \
+    chmod +x ./Lampac; \
+    ./Lampac --urls http://0.0.0.0:8080"]
