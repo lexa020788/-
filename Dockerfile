@@ -1,5 +1,5 @@
 
-FROM mcr.microsoft.com/dotnet/aspnet:9.0
+FROM ghcr.io/lampac-talks/lampac:amd64
 
 # Устанавливаем ICU (важно для парсеров)
 RUN apt-get update && apt-get install -y \
