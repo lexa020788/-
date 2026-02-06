@@ -8,12 +8,12 @@ RUN apt-get update && apt-get install -y \
     libicu-dev \
 && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /app/module && echo 'repositories: \n  - name: "Lampac" \n    url: "https://lampa.weritos.online"' > /app/module/repository.yaml
+RUN mkdir -p /app/module && echo 'repositories: \n  - name: "Lampac" \n    url: "https://github.com"' > /app/module/repository.yaml
 
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y wget unzip curl ca-certificates && \
-    wget https://lampa.weritos.online/publish.zip -O /tmp/publish.zip && \
+    wget https://github.com/publish.zip -O /tmp/publish.zip && \
     unzip -o /tmp/publish.zip -d /app && \
     rm /tmp/publish.zip
     
