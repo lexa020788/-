@@ -1,24 +1,12 @@
-# 1. Оригинал
 FROM --platform=linux/amd64 ghcr.io/lampac-talks/lampac:amd64
 
-# Системные либы (на всякий случай для прокси и веба)
-RUN apt-get update && apt-get install -y \
-    curl \
-    ca-certificates \
-    libicu-dev \
-&& rm -rf /var/lib/apt/lists/*
+# Ставим только самое нужное
+RUN apt-get update && apt-get install -y curl ca-certificates libicu-dev && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Не создаем новые папки, работаем там, где уже есть Лампак
+WORKDIR /
 
-# 2. Собираем файлы (теперь ищем именно исполняемый файл Lampac)
-RUN cp -rn /home/runner/work/lampac/lampac/* /app/ 2>/dev/null || :
-RUN cp -rn /* /app/ 2>/dev/null || :
-
-# 3. Репозиторий плагинов
-RUN mkdir -p /app/module && \
-    echo 'repositories:\n  - name: "Lampac"\n    url: "https://lampac.sh"' > /app/module/repository.yaml
-
-# 4. Конфиг
+# Создаем конфиг прямо в корне (рядом с бинарником)
 RUN echo '{\
   "listenport": 8080, \
   "dlna": { "downloadSpeed": 25000000 },\
@@ -42,17 +30,18 @@ RUN echo '{\
   "overrideResponse": [\
     { "pattern": "/msx/start.json", "action": "file", "type": "application/json; charset=utf-8", "val": "myfile.json" }\
   ]\
-}' > /app/init.conf
+}' > init.conf
 
-# Даем права на запуск самого файла Lampac (без расширения) и на конфиги
-RUN chmod +x /app/Lampac 2>/dev/null || :
-RUN chmod -R 777 /app/init.conf /app/module
+# Создаем папку модулей
+RUN mkdir -p module && \
+    echo 'repositories:\n  - name: "Lampac"\n    url: "https://lampac.sh"' > module/repository.yaml
 
-# Среда
-ENV DOTNET_GCHeapHardLimit=1C000000
-ENV PORT=8080 
+# Даем права только на конфиг и модули
+RUN chmod 777 init.conf && chmod -R 777 module
+
+# Настройки Koyeb
+ENV PORT=8080
 EXPOSE 8080
 
-# 5. ЗАПУСК БЕЗ DOTNET
-# Мы ищем файл Lampac (исполняемый) и запускаем его напрямую
-ENTRYPOINT ["sh", "-c", "exec $(find / -name Lampac -type f -not -name '*.*' | head -n 1) --urls http://0.0.0.0:8080"]
+# ЗАПУСК: Ищем бинарник Lampac и запускаем его напрямую
+ENTRYPOINT ["sh", "-c", "chmod +x ./Lampac 2>/dev/null; ./Lampac --urls http://0.0.0.0:8080"]
