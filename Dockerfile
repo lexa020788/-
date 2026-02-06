@@ -1,7 +1,7 @@
-# 1. Используем официальный образ (в нем Lampac уже установлен в корень)
+# 1. Используем официальный образ
 FROM ghcr.io/lampac-talks/lampac:amd64
 
-# Устанавливаем зависимости (важно для парсеров)
+# Устанавливаем зависимости
 RUN apt-get update && apt-get install -y \
     curl \
     ca-certificates \
@@ -9,10 +9,11 @@ RUN apt-get update && apt-get install -y \
 && rm -rf /var/lib/apt/lists/*
 
 # 2. Настраиваем репозиторий плагинов
+# В этом образе корень приложения — это /
 RUN mkdir -p /module && \
     echo 'repositories:\n  - name: "Lampac"\n    url: "https://lampac.sh"' > /module/repository.yaml
 
-# 3. ТВОЙ КОНФИГ (создаем его в корне / и в /app для надежности)
+# 3. ТВОЙ КОНФИГ
 RUN echo '{\
   "listen": {"port": 8080, "frontend": "cloudflare"},\
   "host": "lampohka.koyeb.app",\
@@ -42,13 +43,14 @@ RUN echo '{\
   "Animebesst": {"enable": true, "useproxy": true, "host": "https://anime1.best"}\
 }' > /init.conf
 
-# Права на исполнение
-RUN chmod -R 777 /
+# 4. ПРАВА ДОСТУПА (только на нужные папки)
+RUN chmod 777 /init.conf && chmod -R 777 /module
 
 # Настройки среды
 ENV DOTNET_GCHeapHardLimit=1C000000 
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
-# 4. ФИНАЛЬНЫЙ ЗАПУСК (указываем путь от корня, где лежит DLL в этом образе)
+# 5. ФИНАЛЬНЫЙ ЗАПУСК
+# В образе ghcr.io приложение лежит в корне
 ENTRYPOINT ["dotnet", "/Lampac.dll", "--urls=http://0.0.0.0:8080", "--contentroot=/"]
