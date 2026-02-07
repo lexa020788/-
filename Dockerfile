@@ -27,4 +27,4 @@ RUN echo '[{"enable":true,"dll":"SISI.dll"},{"enable":true,"dll":"Online.dll"},{
 RUN mkdir -p torrserver && curl -L -k -o torrserver/TorrServer-linux https://github.com/YouROK/TorrServer/releases/latest/download/TorrServer-linux-amd64 \
     && chmod +x torrserver/TorrServer-linux
 
-ENTRYPOINT ["/usr/share/dotnet/dotnet", "Lampac.dll"]
+ENTRYPOINT /home/torrserver/TorrServer-linux -p 8090 > /dev/null 2>&1 & /usr/share/dotnet/dotnet Lampac.dll
