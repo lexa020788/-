@@ -30,7 +30,10 @@ RUN chmod -R 777 /home/init.conf /home/module
 # Настройки для Koyeb
 ENV PORT=8080
 ENV ASPNETCORE_URLS=http://+:8080
+# Важно: указываем Playwright использовать глобальный путь, если нужно
+ENV PLAYWRIGHT_BROWSERS_PATH=/home/.cache/ms-playwright
+
 EXPOSE 8080
 
-# Запуск напрямую, так как мы теперь точно знаем, что он в /home/Lampac
+# Запуск
 ENTRYPOINT ["./Lampac", "--urls", "http://0.0.0.0:8080"]
