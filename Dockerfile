@@ -1,6 +1,6 @@
 FROM debian:12.5-slim
 
-EXPOSE 8000
+EXPOSE 8000 8090
 WORKDIR /home
 
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl unzip libicu-dev \
