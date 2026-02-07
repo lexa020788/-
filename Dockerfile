@@ -1,42 +1,53 @@
-FROM --platform=linux/amd64 ghcr.io/lampac-talks/lampac:amd64
-
-RUN apt-get update && apt-get install -y curl ca-certificates libicu-dev && rm -rf /var/lib/apt/lists/*
-
-# Лампак в этом образе работает из /home
-WORKDIR /home
-
-# Создаем структуру папок, которую он хочет
-RUN mkdir -p /home/module && \
-    echo 'repositories:\n  - name: "Lampac"\n    url: "https://lampac.sh"' > /home/module/repository.yaml
-
-# Твой конфиг (я поменял в нем listenport на 8080, чтобы Koyeb был доволен)
-RUN echo '{\
-  "listenport": 8080, \
-  "dlna": { "downloadSpeed": 25000000 },\
-  "Rezka": { "streamproxy": true },\
-  "Zetflix": {\
-    "displayname": "Zetflix - 1080p", \
-    "geostreamproxy": ["UA"], \
-    "apn": "http://apn.cfhttp.top"\
-  },\
-  "Kodik": {\
-    "useproxy": true, \
-    "proxy": { "list": ["socks5://91.1.1.1:5481", "91.2.2.2:5481"] }\
-  }\
-}' > /home/init.conf
-
-RUN chmod +x ./Lampac && \
-    ./Lampac --download-chromium || true
-
-RUN chmod -R 777 /home/init.conf /home/module
-
-# Настройки для Koyeb
-ENV PORT=8080
-ENV ASPNETCORE_URLS=http://+:8080
-# Важно: указываем Playwright использовать глобальный путь, если нужно
-ENV PLAYWRIGHT_BROWSERS_PATH=/home/.cache/ms-playwright
-
-EXPOSE 8080
-
-# Запуск
-ENTRYPOINT ["./Lampac", "--urls", "http://0.0.0.0:8080"]
+{
+  "listenport": 9120, // изменили порт
+  "dlna": {
+    "downloadSpeed": 25000000 // ограничили скорость загрузки до 200 Mbit/s
+  },
+  "Rezka": {
+    "streamproxy": true // отправили видеопоток через "http://IP:9118/proxy/{uri}" 
+  },
+  "Zetflix": {
+    "displayname": "Zetflix - 1080p", // изменили название
+    "geostreamproxy": ["UA"], // поток для UA будет идти через "http://IP:9118/proxy/{uri}" 
+    "apn": "http://apn.cfhttp.top" // заменяем прокси "http://IP:9118/proxy/{uri}" на "http://apn.cfhttp.top/{uri}"
+  },
+  "Kodik": {
+    "useproxy": true, // использовать прокси
+    "proxy": {        // использовать 91.1.1.1 и 92.2.2.2
+      "list": [
+        "socks5://91.1.1.1:5481", // socks5
+        "91.2.2.2:5481" // http
+      ]
+    }
+  },
+  "Ashdi": {
+    "useproxy": true // использовать прокси 93.3.3.3
+  },
+  "Filmix": {
+    "token": "protoken" // добавили токен от PRO аккаунта
+  },
+  "PornHub": {
+    "enable": false // отключили PornHub
+  },
+  "proxy": {
+    "list": [
+      "93.3.3.3:5481"
+    ]
+  },
+  "globalproxy": [
+    {
+      "pattern": "\\.onion",  // запросы на домены .onion отправить через прокси
+      "list": [
+        "socks5://127.0.0.1:9050" // прокси сервер tor
+      ]
+    }
+  ],
+  "overrideResponse": [ // Заменили ответ на данные из файла myfile.json
+    {
+      "pattern": "/msx/start.json",
+      "action": "file",
+      "type": "application/json; charset=utf-8",
+      "val": "myfile.json"
+    }
+  ]
+}
