@@ -25,6 +25,9 @@ RUN echo '{\
   }\
 }' > /home/init.conf
 
+RUN chmod +x ./Lampac && \
+    ./Lampac --download-chromium || true
+
 RUN chmod -R 777 /home/init.conf /home/module
 
 # Настройки для Koyeb
