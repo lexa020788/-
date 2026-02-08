@@ -30,4 +30,6 @@ RUN echo '[{"enable":true,"dll":"SISI.dll"},{"enable":true,"dll":"Online.dll"},{
 RUN mkdir -p torrserver && curl -L -k -o torrserver/TorrServer-linux https://github.com/YouROK/TorrServer/releases/latest/download/TorrServer-linux-amd64 \
     && chmod +x torrserver/TorrServer-linux
 
+RUN playwright install --with-deps
+
 ENTRYPOINT ["/usr/share/dotnet/dotnet", "Lampac.dll"]
