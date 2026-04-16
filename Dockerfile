@@ -18,9 +18,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Исправленная загрузка SDK с правильным доменом и переменными
 RUN ARCH_TYPE=${BUILDARCH:-amd64} && \
     if [ "$ARCH_TYPE" = "arm64" ]; then \
-      SDK_URL="https://azureedge.net{DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz"; \
+      SDK_URL="https://azureedge.net${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz"; \
     else \
-      SDK_URL="https://azureedge.net{DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz"; \
+      SDK_URL="https://azureedge.net${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz"; \
     fi && \
     curl -fSL -o /tmp/dotnet.tar.gz "${SDK_URL}" && \
     mkdir -p /usr/share/dotnet && \
@@ -45,9 +45,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Исправленная загрузка Runtime
 RUN TARGET_TYPE=${TARGETARCH:-amd64} && \
     if [ "$TARGET_TYPE" = "arm64" ]; then \
-      R_URL="https://azureedge.net{DOTNET_VERSION}/dotnet-runtime-${DOTNET_VERSION}-linux-arm64.tar.gz"; \
+      R_URL="https://azureedge.net${DOTNET_VERSION}/dotnet-runtime-${DOTNET_VERSION}-linux-arm64.tar.gz"; \
     else \
-      R_URL="https://azureedge.net{DOTNET_VERSION}/dotnet-runtime-${DOTNET_VERSION}-linux-x64.tar.gz"; \
+      R_URL="https://azureedge.net${DOTNET_VERSION}/dotnet-runtime-${DOTNET_VERSION}-linux-x64.tar.gz"; \
     fi && \
     curl -fSL -o /tmp/dotnet.tar.gz "${R_URL}" && \
     mkdir -p /usr/share/dotnet && \
