@@ -1,76 +1,85 @@
-# Версии .NET
-ARG DOTNET_VERSION=9.0.2
-ARG DOTNET_SDK_VERSION=9.0.200
+# Multi-platform Dockerfile для Koyeb (linux/amd64 и linux/arm64)
+ARG DOTNET_VERSION=10.0.5
+ARG DOTNET_SDK_VERSION=10.0.201
 
-# --- Stage 1: Сборка ---
-FROM --platform=$BUILDPLATFORM debian:12-slim AS builder
+# --- Builder Stage ---
+FROM --platform=$BUILDPLATFORM debian:13-slim AS builder
 
 ARG BUILDARCH
 ARG TARGETARCH
+ARG DOTNET_VERSION
 ARG DOTNET_SDK_VERSION
 
 WORKDIR /build
 COPY . .
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl xz-utils libicu72 && rm -rf /var/lib/apt/lists/*
+    ca-certificates curl libicu76 xz-utils && rm -rf /var/lib/apt/lists/*
 
-# Исправленная загрузка SDK с правильным доменом и переменными
-RUN ARCH_TYPE=${BUILDARCH:-amd64} && \
-    if [ "$ARCH_TYPE" = "arm64" ]; then \
-      SDK_URL="https://azureedge.net${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz"; \
-    else \
-      SDK_URL="https://azureedge.net${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz"; \
-    fi && \
-    curl -fSL -o /tmp/dotnet.tar.gz "${SDK_URL}" && \
-    mkdir -p /usr/share/dotnet && \
-    tar -zxf /tmp/dotnet.tar.gz -C /usr/share/dotnet
+RUN mkdir -p /out/usr/share/dotnet /out/lampac
 
-# Определение архитектуры публикации (RID)
-RUN TARGET_TYPE=${TARGETARCH:-amd64} && \
-    if [ "$TARGET_TYPE" = "arm64" ]; then RID="linux-arm64"; else RID="linux-x64"; fi && \
-    /usr/share/dotnet/dotnet publish -c Release -r "$RID" --self-contained false --output /out Core/Core.csproj
+RUN case "$BUILDARCH" in \
+    arm64) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
+    amd64) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; \
+    esac \
+    && curl -fSL -o /tmp/dotnet-sdk.tar.gz "${SDK_URL}" \
+    && tar -oxzf /tmp/dotnet-sdk.tar.gz -C /out/usr/share/dotnet \
+    && rm /tmp/dotnet-sdk.tar.gz
 
-# --- Stage 2: Финальный образ ---
-FROM debian:12-slim
+RUN case "$TARGETARCH" in \
+    arm64) \
+    RT_URL="https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-arm64.tar.gz" \
+    FFMPEG_URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linuxarm64-gpl.tar.xz" \
+    RID=linux-arm64 ;; \
+    amd64) \
+    RT_URL="https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-x64.tar.gz" \
+    FFMPEG_URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz" \
+    RID=linux-x64 ;; \
+    esac \
+    && DOTNET_CLI_TELEMETRY_OPTOUT=1 /out/usr/share/dotnet/dotnet publish --configuration Release --runtime "$RID" --output /out/lampac -p:PlaywrightPlatform="$RID" Core/Core.csproj \
+    && rm -rf /out/usr/share/dotnet/* \
+    && curl -fSL -o /tmp/dotnet-runtime.tar.gz "${RT_URL}" \
+    && tar -oxzf /tmp/dotnet-runtime.tar.gz -C /out/usr/share/dotnet \
+    && rm /tmp/dotnet-runtime.tar.gz \
+    && curl -fSL -o /tmp/ffmpeg.tar.xz "${FFMPEG_URL}" \
+    && tar -xJf /tmp/ffmpeg.tar.xz -C /tmp --wildcards "*/bin/ffmpeg" "*/bin/ffprobe" --strip-components=2 \
+    && mv /tmp/ffmpeg /tmp/ffprobe /out/lampac/data/ \
+    && chmod +x /out/lampac/data/ffmpeg /out/lampac/data/ffprobe \
+    && touch /out/lampac/isdocker
 
-ARG TARGETARCH
-ARG DOTNET_VERSION
-WORKDIR /home
-EXPOSE 8000
+# --- Runner Stage ---
+FROM debian:13-slim AS runner
+
+# Настройки для Koyeb
+ENV DOTNET_ROOT=/usr/share/dotnet \
+    PATH="${PATH}:/usr/share/dotnet" \
+    DOTNET_RUNNING_IN_CONTAINER=true \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+    # Порт для Koyeb (приложение должно слушать 8080)
+    ASPNETCORE_URLS=http://+:8080 \
+    CHROMIUM_PATH=/usr/bin/chromium \
+    CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --headless"
+
+WORKDIR /lampac
+# Koyeb по умолчанию открывает 8080
+EXPOSE 8080
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl unzip libicu72 libnspr4 && rm -rf /var/lib/apt/lists/*
+    ca-certificates chromium curl fontconfig libicu76 libnspr4 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Исправленная загрузка Runtime
-RUN TARGET_TYPE=${TARGETARCH:-amd64} && \
-    if [ "$TARGET_TYPE" = "arm64" ]; then \
-      R_URL="https://azureedge.net${DOTNET_VERSION}/dotnet-runtime-${DOTNET_VERSION}-linux-arm64.tar.gz"; \
-    else \
-      R_URL="https://azureedge.net${DOTNET_VERSION}/dotnet-runtime-${DOTNET_VERSION}-linux-x64.tar.gz"; \
-    fi && \
-    curl -fSL -o /tmp/dotnet.tar.gz "${R_URL}" && \
-    mkdir -p /usr/share/dotnet && \
-    tar -zxf /tmp/dotnet.tar.gz -C /usr/share/dotnet && \
-    rm /tmp/dotnet.tar.gz
+# Создаем пользователя (Koyeb поддерживает root, но non-root безопаснее)
+RUN groupadd -r -g 1000 lampac && useradd -r -u 1000 -g lampac -d /lampac lampac
 
-ENV PATH="${PATH}:/usr/share/dotnet"
-ENV DOTNET_ROOT="/usr/share/dotnet"
+# Копируем бинарники
+COPY --chown=lampac:lampac --from=builder /out /
 
-# Копируем результат сборки
-COPY --from=builder /out /home
-RUN touch isdocker
+# Koyeb сам следит за здоровьем контейнера, но HEALTHCHECK не помешает
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/ || exit 1
 
-# Конфигурация приложения
-RUN echo '{"listen":{"port":8000,"scheme":"https","frontend":"cloudflare"},"KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}],"mikrotik":true,"typecache":"mem"}' > /home/init.conf
-RUN mkdir -p /home/module && echo '{"typesearch":"webapi","Anilibria":{"enable":true},"RuTracker":{"enable":true},"lostfilm":{"enable":true}}' > /home/module/JacRed.conf
-RUN echo '[{"enable":true,"dll":"SISI.dll"},{"enable":true,"dll":"Online.dll"},{"enable":true,"initspace":"Catalog.ModInit","dll":"Catalog.dll"},{"enable":true,"initspace":"TorrServer.ModInit","dll":"TorrServer.dll"},{"enable":true,"initspace":"Jackett.ModInit","dll":"JacRed.dll"}]' > /home/module/manifest.json
+USER lampac
 
-# TorrServer с авто-выбором архитектуры
-RUN TARGET_TYPE=${TARGETARCH:-amd64} && \
-    if [ "$TARGET_TYPE" = "arm64" ]; then T_ARCH="arm64"; else T_ARCH="amd64"; fi && \
-    mkdir -p torrserver && \
-    curl -L -o torrserver/TorrServer-linux "https://github.com{T_ARCH}" && \
-    chmod +x torrserver/TorrServer-linux
-
-ENTRYPOINT ["/usr/share/dotnet/dotnet", "Lampac.dll"]
+# Запуск. Убедитесь, что Core.dll — это входная точка вашего приложения
+ENTRYPOINT ["dotnet", "lampac/Core.dll"]
