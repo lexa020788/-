@@ -1,82 +1,72 @@
-# Multi-platform Dockerfile для Koyeb
-ARG DOTNET_VERSION=10.0.5
-ARG DOTNET_SDK_VERSION=10.0.201
+# Аргументы версии
+ARG DOTNET_VERSION=9.0.2
 
-# --- Builder Stage ---
-FROM --platform=$BUILDPLATFORM debian:13-slim AS builder
-
-ARG BUILDARCH
+# --- СТАДИЯ 1: Builder (подготовка файлов) ---
+FROM --platform=$BUILDPLATFORM debian:12-slim AS builder
 ARG TARGETARCH
-ARG DOTNET_VERSION
-ARG DOTNET_SDK_VERSION
-
-WORKDIR /build
-# Копируем всё содержимое репозитория
-COPY . .
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl libicu76 xz-utils && rm -rf /var/lib/apt/lists/*
+    ca-certificates curl unzip && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /out/usr/share/dotnet /out/lampac
+WORKDIR /out
 
-# Установка SDK для сборки
-RUN case "$BUILDARCH" in \
-    arm64) SDK_URL="https://microsoft.com{DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
-    amd64) SDK_URL="https://microsoft.com{DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; \
-    esac \
-    && curl -fSL -o /tmp/dotnet-sdk.tar.gz "${SDK_URL}" \
-    && tar -oxzf /tmp/dotnet-sdk.tar.gz -C /out/usr/share/dotnet \
-    && rm /tmp/dotnet-sdk.tar.gz
+# Скачиваем последний релиз Lampac
+RUN curl -L -o publish.zip https://github.com \
+    && unzip -o publish.zip -d /out && rm publish.zip \
+    # Чистка лишнего (экономим место)
+    && rm -rf /out/merchant /out/runtimes/os* /out/runtimes/win* /out/runtimes/linux-arm /out/runtimes/linux-musl* \
+    && touch /out/isdocker
 
-# Сборка приложения
-RUN case "$TARGETARCH" in \
-    arm64) \
-    RT_URL="https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-arm64.tar.gz" \
-    FFMPEG_URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linuxarm64-gpl.tar.xz" \
-    RID=linux-arm64 ;; \
-    amd64) \
-    RT_URL="https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-x64.tar.gz" \
-    FFMPEG_URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz" \
-    RID=linux-x64 ;; \
-    esac \
-    # Автоматический поиск .csproj файла, если Core/Core.csproj не найден
-    && PROJECT_FILE=$(find . -name "Core.csproj" | head -n 1) \
-    && echo "Found project: $PROJECT_FILE" \
-    && DOTNET_CLI_TELEMETRY_OPTOUT=1 /out/usr/share/dotnet/dotnet publish "$PROJECT_FILE" --configuration Release --runtime "$RID" --output /out/lampac -p:PlaywrightPlatform="$RID" \
-    && rm -rf /out/usr/share/dotnet/* \
-    && curl -fSL -o /tmp/dotnet-runtime.tar.gz "${RT_URL}" \
-    && tar -oxzf /tmp/dotnet-runtime.tar.gz -C /out/usr/share/dotnet \
-    && rm /tmp/dotnet-runtime.tar.gz \
-    && curl -fSL -o /tmp/ffmpeg.tar.xz "${FFMPEG_URL}" \
-    && tar -xJf /tmp/ffmpeg.tar.xz -C /tmp --wildcards "*/bin/ffmpeg" "*/bin/ffprobe" --strip-components=2 \
-    && mv /tmp/ffmpeg /tmp/ffprobe /out/lampac/data/ \
-    && chmod +x /out/lampac/data/ffmpeg /out/lampac/data/ffprobe \
-    && touch /out/lampac/isdocker
+# Скачиваем TorrServer (авто-выбор архитектуры)
+RUN mkdir -p /out/torrserver \
+    && if [ "$TARGETARCH" = "arm64" ]; then TS_ARCH="arm64"; else TS_ARCH="amd64"; fi \
+    && curl -L -o /out/torrserver/TorrServer-linux "https://github.com{TS_ARCH}" \
+    && chmod +x /out/torrserver/TorrServer-linux
 
-# --- Runner Stage ---
-FROM debian:13-slim AS runner
+# --- СТАДИЯ 2: Runner (финальный образ) ---
+FROM debian:12-slim AS runner
+WORKDIR /home
+ARG TARGETARCH
+ARG DOTNET_VERSION
 
+# Ставим зависимости: 
+# Chromium + шрифты (для онлайна), ICU (для .NET), procps (для мониторинга)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    chromium \
+    libicu72 \
+    libfontconfig1 \
+    fonts-liberation \
+    procps \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Установка .NET Runtime
+RUN if [ "$TARGETARCH" = "arm64" ]; then DOTNET_ARCH="arm64"; else DOTNET_ARCH="x64"; fi \
+    && curl -fSL -o dotnet.tar.gz "https://microsoft.com${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-${DOTNET_ARCH}.tar.gz" \
+    && mkdir -p /usr/share/dotnet \
+    && tar -oxzf dotnet.tar.gz -C /usr/share/dotnet \
+    && rm dotnet.tar.gz
+
+# Настройка переменных окружения
 ENV DOTNET_ROOT=/usr/share/dotnet \
     PATH="${PATH}:/usr/share/dotnet" \
     DOTNET_RUNNING_IN_CONTAINER=true \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
-    ASPNETCORE_URLS=http://+:8080 \
     CHROMIUM_PATH=/usr/bin/chromium \
-    CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --headless"
+    CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu"
 
-WORKDIR /lampac
-EXPOSE 8080
+# Копируем приложение
+COPY --from=builder /out /home/
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates chromium curl fontconfig libicu76 libnspr4 \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Генерируем конфиги (Твои настройки + исправленный Chromium и Rezka)
+RUN mkdir -p /home/module && \
+    echo '{"listen":{"port":8000,"scheme":"https","frontend":"cloudflare"},"KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}],"mikrotik":true,"typecache":"mem","GC":{"enable":true,"Concurrent":false,"ConserveMemory":9,"HighMemoryPercent":1,"RetainVM":false},"WAF":{"enable":false,"bypassLocalIP":true,"allowExternalIpAccess":true,"bruteForceProtection":false},"watcherInit":"cron","pirate_store":false,"rch":{"keepalive":900},"weblog":{"enable":true},"chromium":{"enable":true,"path":"/usr/bin/chromium"},"LampaWeb":{"autoupdate":false,"initPlugins":{"timecode":false,"backup":false,"sync":false}},"cub":{"enable":true,"geo":["RU"]},"tmdb":{"enable":true},"online":{"checkOnlineSearch":true},"sisi":{"push_all":false,"rsize_disable":["BongaCams","Chaturbate","Runetki","PornHub","Eporner","HQporner","Spankbang","Porntrex","Xnxx","Xvideos","Xhamster","Tizam"]},"Rezka":{"rhub":true,"scheme":"https"}}' > /home/init.conf && \
+    echo '{"typesearch":"webapi","Anilibria":{"enable":true},"RuTracker":{"enable":true},"lostfilm":{"enable":true}}' > /home/module/JacRed.conf && \
+    echo '[{"enable":true,"dll":"SISI.dll"},{"enable":true,"dll":"Online.dll"},{"enable":true,"initspace":"Catalog.ModInit","dll":"Catalog.dll"},{"enable":true,"initspace":"TorrServer.ModInit","dll":"TorrServer.dll"},{"enable":true,"initspace":"Jackett.ModInit","dll":"JacRed.dll"}]' > /home/module/manifest.json
 
-RUN groupadd -r -g 1000 lampac && useradd -r -u 1000 -g lampac -d /lampac lampac
-COPY --chown=lampac:lampac --from=builder /out /
+# Финальное обновление плагинов
+RUN curl -s https://githubusercontent.com | bash
 
-# Проверка работоспособности
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8080/ || exit 1
-
-USER lampac
-ENTRYPOINT ["dotnet", "lampac/Core.dll"]
+EXPOSE 8000
+ENTRYPOINT ["dotnet", "Lampac.dll"]
