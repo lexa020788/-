@@ -1,56 +1,32 @@
-ARG DOTNET_VERSION=9.0.2
-
-# --- СТАДИЯ 1: Подготовка (Builder) ---
-FROM --platform=$BUILDPLATFORM debian:12-slim AS builder
-ARG TARGETARCH
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl unzip && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /out
-
-# Ссылка ПРОВЕРЕНА, она полная. Коуеб увидит её в логах целиком.
-RUN curl -L -o publish.zip "https://github.com" \
-    && unzip -o publish.zip -d /out && rm publish.zip \
-    && rm -rf /out/merchant /out/runtimes/os* /out/runtimes/win* /out/runtimes/linux-arm /out/runtimes/linux-musl* \
-    && touch /out/isdocker
-
-RUN mkdir -p /out/torrserver \
-    && if [ "$TARGETARCH" = "arm64" ]; then TS_ARCH="arm64"; else TS_ARCH="amd64"; fi \
-    && curl -L -o /out/torrserver/TorrServer-linux "https://github.com${TS_ARCH}" \
-    && chmod +x /out/torrserver/TorrServer-linux
-
-# --- СТАДИЯ 2: Финальный образ (Runner) ---
-FROM debian:12-slim AS runner
-WORKDIR /home
-ARG TARGETARCH
-ARG DOTNET_VERSION
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl chromium libicu72 procps libfontconfig1 fonts-liberation \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Установка .NET с ПРАВИЛЬНЫМИ знаками доллара $
-RUN if [ "$TARGETARCH" = "arm64" ]; then DOTNET_ARCH="arm64"; else DOTNET_ARCH="x64"; fi \
-    && curl -fSL -o dotnet.tar.gz "https://microsoft.com${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-${DOTNET_ARCH}.tar.gz" \
-    && mkdir -p /usr/share/dotnet && tar -oxzf dotnet.tar.gz -C /usr/share/dotnet && rm dotnet.tar.gz
-
-ENV DOTNET_ROOT=/usr/share/dotnet \
-    PATH="${PATH}:/usr/share/dotnet" \
-    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
-    CHROMIUM_PATH=/usr/bin/chromium \
-    CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage"
-
-COPY --from=builder /out /home/
-
-# Твои JSON настройки
-RUN mkdir -p /home/module && \
-    echo '{"listen":{"port":8000,"scheme":"https","frontend":"cloudflare"},"KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}],"mikrotik":true,"typecache":"mem","GC":{"enable":true,"Concurrent":false,"ConserveMemory":9,"HighMemoryPercent":1,"RetainVM":false},"WAF":{"enable":false,"bypassLocalIP":true,"allowExternalIpAccess":true,"bruteForceProtection":false},"watcherInit":"cron","pirate_store":false,"rch":{"keepalive":900},"weblog":{"enable":true},"chromium":{"enable":true,"path":"/usr/bin/chromium"},"LampaWeb":{"autoupdate":false},"cub":{"enable":true,"geo":["RU"]},"tmdb":{"enable":true},"online":{"checkOnlineSearch":false},"sisi":{"push_all":false,"rsize_disable":["BongaCams","Chaturbate","Runetki","PornHub","Eporner","HQporner","Spankbang","Porntrex","Xnxx","Xvideos","Xhamster","Tizam"]},"Rezka":{"rhub":true,"scheme":"https"}}' > /home/init.conf && \
-    echo '{"typesearch":"webapi","Anilibria":{"enable":true},"RuTracker":{"enable":true},"lostfilm":{"enable":true}}' > /home/module/JacRed.conf && \
-    echo '[{"enable":true,"dll":"SISI.dll"},{"enable":true,"dll":"Online.dll"},{"enable":true,"initspace":"Catalog.ModInit","dll":"Catalog.dll"},{"enable":true,"initspace":"TorrServer.ModInit","dll":"TorrServer.dll"},{"enable":true,"initspace":"Jackett.ModInit","dll":"JacRed.dll"}]' > /home/module/manifest.json
-
-# Обновление плагинов (Коуеб увидит это в конце сборки)
-RUN curl -s https://githubusercontent.com | bash
+FROM debian:12.5-slim
 
 EXPOSE 8000
-ENTRYPOINT ["dotnet", "Lampac.dll"]
+WORKDIR /home
+
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl unzip libicu-dev \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fSL -k -o dotnet.tar.gz https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/9.0.12/aspnetcore-runtime-9.0.12-linux-x64.tar.gz \
+    && mkdir -p /usr/share/dotnet \
+    && tar -oxzf dotnet.tar.gz -C /usr/share/dotnet \
+    && rm dotnet.tar.gz
+
+RUN curl -L -k -o publish.zip https://github.com/lampac-talks/lampac/releases/latest/download/publish.zip \
+    && unzip -o publish.zip && rm -f publish.zip && rm -rf merchant \
+    && rm -rf runtimes/os* && rm -rf runtimes/win* && rm -rf runtimes/linux-arm runtimes/linux-arm64 runtimes/linux-musl-arm64 runtimes/linux-musl-x64 \
+    && touch isdocker
+
+# Сначала запускаем скрипт обновления плагинов
+RUN curl -k -s https://raw.githubusercontent.com/lampac-talks/lampac/main/Build/Docker/update.sh | bash
+
+# Записываем конфиг init.conf (Chromium включен, настройки SISI сохранены)
+RUN echo '{"listen":{"port":8000,"scheme":"https","frontend":"cloudflare"},"KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}],"mikrotik":true,"typecache":"mem","GC":{"enable":true,"Concurrent":false,"ConserveMemory":9,"HighMemoryPercent":1,"RetainVM":false},"WAF":{"enable":false,"bypassLocalIP":true,"allowExternalIpAccess":true,"bruteForceProtection":false},"watcherInit":"cron","pirate_store":false,"rch":{"keepalive":900},"weblog":{"enable":true},"chromium":{"enable":true,"path":"/usr/bin/chromium"},"firefox":{"enable":false},"LampaWeb":{"autoupdate":false,"initPlugins":{"timecode":false,"backup":false,"sync":false}},"cub":{"enable":true,"geo":["RU"]},"tmdb":{"enable":true},"serverproxy":{"verifyip":false,"buffering":{"enable":false},"image":{"cache":false,"cache_rsize":false}},"online":{"checkOnlineSearch":false},"sisi":{"push_all":false,"rsize_disable":["BongaCams","Chaturbate","Runetki","PornHub","Eporner","HQporner","Spankbang","Porntrex","Xnxx","Xvideos","Xhamster","Tizam"],"proxyimg_disable":["Ebalovo"]},"Mirage":{"displayindex":1},"Ashdi":{"rhub":true},"Kinoukr":{"rhub":true},"VDBmovies":{"rhub":true},"VideoDB":{"rhub":true},"FanCDN":{"rhub":true},"Rezka":{"rhub":true,"scheme":"https"},"Kinotochka":{"rhub":true,"rhub_streamproxy":true,"rhub_geo_disable":["RU"]},"Videoseed":{"streamproxy":false},"Vibix":{"streamproxy":false},"iRemux":{"streamproxy":false},"Rgshows":{"streamproxy":false},"Autoembed":{"enable":false},"Animevost":{"rhub":true},"AnilibriaOnline":{"rhub":true},"Ebalovo":{"rhub":true},"Spankbang":{"rhub":true,"rhub_geo_disable":["RU"]},"BongaCams":{"rhub":true},"Chaturbate":{"rhub":true,"rhub_geo_disable":["RU"]},"Runetki":{"rhub":true},"HQporner":{"rhub":true,"geo_hide":["RU"]},"Eporner":{"rhub_geo_disable":["RU"]},"Porntrex":{"rhub":true,"rhub_geo_disable":["RU"]},"Xhamster":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true,"rhub_geo_disable":["RU"]},"Xnxx":{"rhub":true,"rhub_fallback":true,"rhub_streamproxy":true,"rhub_geo_disable":["RU"]},"Tizam":{"rhub":true,"rhub_fallback":true},"Xvideos":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true,"rhub_geo_disable":["RU"]},"PornHub":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"RutubeMovie":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true,"rhub_geo_disable":["UA"]},"VkMovie":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"Plvideo":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true,"rhub_geo_disable":["UA"]},"CDNvideohub":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"Redheadsound":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"CDNmovies":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"AniMedia":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"Animebesst":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true}}' > /home/init.conf
+
+RUN echo '{"typesearch":"webapi","Anilibria":{"enable":true},"RuTracker":{"enable":true},"lostfilm":{"enable":true}}' > /home/module/JacRed.conf
+
+RUN echo '[{"enable":true,"dll":"SISI.dll"},{"enable":true,"dll":"Online.dll"},{"enable":true,"initspace":"Catalog.ModInit","dll":"Catalog.dll"},{"enable":true,"initspace":"TorrServer.ModInit","dll":"TorrServer.dll"},{"enable":true,"initspace":"Jackett.ModInit","dll":"JacRed.dll"}]' > /home/module/manifest.json
+
+RUN mkdir -p torrserver && curl -L -k -o torrserver/TorrServer-linux https://github.com/YouROK/TorrServer/releases/latest/download/TorrServer-linux-amd64 \
+    && chmod +x torrserver/TorrServer-linux
+
+ENTRYPOINT ["/usr/share/dotnet/dotnet", "Lampac.dll"]
