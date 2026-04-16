@@ -1,30 +1,126 @@
-FROM debian:12.5-slim
+# Multi-platform Dockerfile for linux/amd64 and linux/arm64
+# Build with: docker buildx build --platform linux/amd64,linux/arm64 -f Dockerfile .
 
-EXPOSE 8000
-WORKDIR /home
+# Global ARGs
+ARG DOTNET_VERSION=10.0.5
+ARG DOTNET_SDK_VERSION=10.0.201
 
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl unzip libicu-dev \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Builder image — platform set by buildx
+FROM --platform=$BUILDPLATFORM debian:13-slim AS builder
 
-RUN curl -fSL -k -o dotnet.tar.gz https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/9.0.12/aspnetcore-runtime-9.0.12-linux-x64.tar.gz \
-    && mkdir -p /usr/share/dotnet \
-    && tar -oxzf dotnet.tar.gz -C /usr/share/dotnet \
-    && rm dotnet.tar.gz
+ARG BUILDARCH
+ARG TARGETARCH
+ARG DOTNET_VERSION
+ARG DOTNET_SDK_VERSION
 
-RUN curl -L -k -o publish.zip https://github.com/lampac-nextgen/lampac/releases/latest/download/publish.zip \
-    && unzip -o publish.zip && rm -f publish.zip && rm -rf merchant \
-    && rm -rf runtimes/os* && rm -rf runtimes/win* && rm -rf runtimes/linux-arm runtimes/linux-arm64 runtimes/linux-musl-arm64 runtimes/linux-musl-x64 \
-    && touch isdocker
+RUN mkdir -p /out
 
-RUN curl -k -s https://raw.githubusercontent.com/lampac-nextgen/lampac/main/update.sh | bash
+WORKDIR /build
 
-RUN echo '{"listen":{"port":8000,"scheme":"https","frontend":"cloudflare"},"KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}],"mikrotik":true,"typecache":"mem","GC":{"enable":true,"Concurrent":false,"ConserveMemory":9,"HighMemoryPercent":1,"RetainVM":false},"WAF":{"enable":false,"bypassLocalIP":true,"allowExternalIpAccess":true,"bruteForceProtection":false},"watcherInit":"cron","pirate_store":false,"rch":{"keepalive":900},"weblog":{"enable":true},"chromium":{"enable":false},"firefox":{"enable":false},"LampaWeb":{"autoupdate":false,"initPlugins":{"timecode":false,"backup":false,"sync":false}},"cub":{"enable":true,"geo":["RU"]},"tmdb":{"enable":true},"serverproxy":{"verifyip":false,"buffering":{"enable":false},"image":{"cache":false,"cache_rsize":false}},"online":{"checkOnlineSearch":false},"sisi":{"push_all":false,"rsize_disable":["BongaCams","Chaturbate","Runetki","PornHub","Eporner","HQporner","Spankbang","Porntrex","Xnxx","Xvideos","Xhamster","Tizam"],"proxyimg_disable":["Ebalovo"]},"Mirage":{"displayindex":1},"Ashdi":{"rhub":true},"Kinoukr":{"rhub":true},"VDBmovies":{"rhub":true},"VideoDB":{"rhub":true},"FanCDN":{"rhub":true},"Rezka":{"rhub":true,"scheme":"https"},"Kinotochka":{"rhub":true,"rhub_streamproxy":true,"streamproxy":false,"geostreamproxy":null,"rhub_geo_disable":["RU"]},"Videoseed":{"streamproxy":false,"geostreamproxy":null},"Vibix":{"streamproxy":false,"geostreamproxy":null},"iRemux":{"streamproxy":false,"geostreamproxy":null},"Rgshows":{"streamproxy":false,"geostreamproxy":null},"Autoembed":{"enable":false},"Animevost":{"rhub":true},"AnilibriaOnline":{"rhub":true},"Ebalovo":{"rhub":true},"Spankbang":{"rhub":true,"rhub_geo_disable":["RU"]},"BongaCams":{"rhub":true},"Chaturbate":{"rhub":true,"rhub_geo_disable":["RU"]},"Runetki":{"rhub":true},"HQporner":{"rhub":true,"streamproxy":false,"geostreamproxy":null,"qualitys_proxy":false,"geo_hide":["RU"]},"Eporner":{"streamproxy":false,"geostreamproxy":null,"qualitys_proxy":false,"rhub_geo_disable":["RU"]},"Porntrex":{"rhub":true,"streamproxy":false,"geostreamproxy":null,"qualitys_proxy":false,"rhub_geo_disable":["RU"]},"Xhamster":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true,"rhub_geo_disable":["RU"]},"Xnxx":{"rhub":true,"rhub_fallback":true,"rhub_streamproxy":true,"rhub_geo_disable":["RU"]},"Tizam":{"rhub":true,"rhub_fallback":true,"streamproxy":false,"geostreamproxy":null,"qualitys_proxy":false},"Xvideos":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true,"rhub_geo_disable":["RU"]},"PornHub":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"RutubeMovie":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true,"rhub_geo_disable":["UA"]},"VkMovie":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"Plvideo":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true,"rhub_geo_disable":["UA"]},"CDNvideohub":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"Redheadsound":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"CDNmovies":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"AniMedia":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"Animebesst":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true}}' > /home/init.conf
+COPY . .
 
-RUN echo '{"typesearch":"webapi","Anilibria":{"enable":true},"RuTracker":{"enable":true},"lostfilm":{"enable":true}}' > /home/module/JacRed.conf
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    libicu76 \
+    xz-utils \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN echo '[{"enable":true,"dll":"SISI.dll"},{"enable":true,"dll":"Online.dll"},{"enable":true,"initspace":"Catalog.ModInit","dll":"Catalog.dll"},{"enable":true,"initspace":"TorrServer.ModInit","dll":"TorrServer.dll"},{"enable":true,"initspace":"Jackett.ModInit","dll":"JacRed.dll"}]' > /home/module/manifest.json
+RUN case "$BUILDARCH" in \
+    arm64) \
+    DOTNET_SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" \
+    ;; \
+    amd64) \
+    DOTNET_SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" \
+    ;; \
+    *) echo "Unsupported BUILDARCH: $BUILDARCH" && exit 1 ;; \
+    esac \
+    && case "$TARGETARCH" in \
+    arm64) \
+    DOTNET_RUNTIME_URL="https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-arm64.tar.gz" \
+    FFMPEG_URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linuxarm64-gpl.tar.xz" \
+    RID=linux-arm64 \
+    ;; \
+    amd64) \
+    DOTNET_RUNTIME_URL="https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-x64.tar.gz" \
+    FFMPEG_URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz" \
+    RID=linux-x64 \
+    ;; \
+    *) echo "Unsupported TARGETARCH: $TARGETARCH" && exit 1 ;; \
+    esac \
+    # SDK — required for dotnet publish
+    && curl -fSL -o /tmp/dotnet-sdk.tar.gz "${DOTNET_SDK_URL}" \
+    && mkdir -p /out/usr/share/dotnet \
+    && tar -oxzf /tmp/dotnet-sdk.tar.gz -C /out/usr/share/dotnet \
+    && rm /tmp/dotnet-sdk.tar.gz \
+    # Build the application
+    && DOTNET_CLI_TELEMETRY_OPTOUT=1 /out/usr/share/dotnet/dotnet publish --configuration Release --runtime "$RID" --output /out/lampac -p:PlaywrightPlatform="$RID" Core/Core.csproj \
+    # Replace SDK with ASP.NET Core runtime for the final image
+    && rm -rf /out/usr/share/dotnet \
+    && mkdir -p /out/usr/share/dotnet \
+    && curl -fSL -o /tmp/dotnet-runtime.tar.gz "${DOTNET_RUNTIME_URL}" \
+    && tar -oxzf /tmp/dotnet-runtime.tar.gz -C /out/usr/share/dotnet \
+    && rm /tmp/dotnet-runtime.tar.gz \
+    # FFmpeg & FFprobe — binaries only
+    && curl -fSL -o /tmp/ffmpeg.tar.xz "${FFMPEG_URL}" \
+    && tar -xJf /tmp/ffmpeg.tar.xz -C /tmp \
+    --wildcards "*/bin/ffmpeg" "*/bin/ffprobe" \
+    --strip-components=2 \
+    && mv /tmp/ffmpeg /tmp/ffprobe /out/lampac/data/ \
+    && chmod +x /out/lampac/data/ffmpeg /out/lampac/data/ffprobe \
+    && rm /tmp/ffmpeg.tar.xz \
+    && touch /out/lampac/isdocker
 
-RUN mkdir -p torrserver && curl -L -k -o torrserver/TorrServer-linux https://github.com/YouROK/TorrServer/releases/latest/download/TorrServer-linux-amd64 \
-    && chmod +x torrserver/TorrServer-linux
+# Runner — OS/arch of the published image (amd64 vs arm64)
+FROM debian:13-slim AS runner
 
-ENTRYPOINT ["/usr/share/dotnet/dotnet", "Lampac.dll"]
+ARG TARGETARCH
+
+LABEL org.opencontainers.image.description="Lampac NextGen - Media aggregator" \
+    org.opencontainers.image.licenses="MIT" \
+    org.opencontainers.image.source="https://github.com/lampac-nextgen/lampac" \
+    org.opencontainers.image.vendor="Lampac NextGen"
+
+ENV DOTNET_ROOT=/usr/share/dotnet \
+    PATH="${PATH}:/usr/share/dotnet" \
+    DOTNET_RUNNING_IN_CONTAINER=true \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+    CHROMIUM_PATH=/usr/bin/chromium \
+    CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage"
+
+WORKDIR /lampac
+EXPOSE 9118
+
+# Runtime dependencies
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    chromium \
+    curl \
+    fontconfig \
+    libicu76 \
+    libnspr4 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf \
+    /usr/share/doc \
+    /usr/share/man \
+    /usr/share/info \
+    /usr/share/common-licenses
+
+# Create non-root user before COPY to use --chown
+RUN groupadd -r -g 1000 lampac \
+    && useradd -r -u 1000 -g lampac -d /lampac lampac
+
+# Copy application
+COPY --chown=lampac:lampac --from=builder /out /
+
+# Health check — verify process is running
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD pgrep -x dotnet || exit 1
+
+USER lampac
+
+ENTRYPOINT ["/usr/share/dotnet/dotnet", "Core.dll"]
