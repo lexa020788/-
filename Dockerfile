@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Установка .NET 9.0 (NextGen требует 9-ку)
 # Используем актуальную версию 9.0.0. Для x64.
-RUN curl -fSL -o dotnet.tar.gz https://builds.dotnet_microsoft.com/dotnet/aspnetcore/Runtime/9.0.0/aspnetcore-runtime-9.0.0-linux-x64.tar.gz \
+RUN curl -fSL -o dotnet.tar.gz https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/9.0.0/aspnetcore-runtime-9.0.0-linux-x64.tar.gz \
     && mkdir -p /usr/share/dotnet \
     && tar -oxzf dotnet.tar.gz -C /usr/share/dotnet \
     && rm dotnet.tar.gz
