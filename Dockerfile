@@ -22,9 +22,10 @@ RUN git clone https://github.com/lampac-nextgen/lampac .
 
 # Определение ссылок для загрузки SDK
 # Определение ссылок для загрузки SDK
+# Определение ссылок для загрузки SDK
 RUN case "$BUILDARCH" in \
-    arm64) SDK_URL="https://microsoft.com${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
-    *) SDK_URL="https://microsoft.com${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; \
+    arm64) SDK_URL="https://microsoft.com{DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
+    *) SDK_URL="https://microsoft.com{DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; \
     esac \
     && curl -fSL -o /tmp/dotnet-sdk.tar.gz "${SDK_URL}" \
     && mkdir -p /out/usr/share/dotnet \
