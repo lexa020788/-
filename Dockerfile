@@ -17,6 +17,14 @@ RUN mkdir -p /out
 
 WORKDIR /build
 
+# Копируем конкретную папку, игнорируя настройки .dockerignore для неё
+COPY Core/ ./Core/
+COPY Shared/ ./Shared/
+COPY Modules/ ./Modules/
+# Если есть другие важные папки, добавьте их так же
+COPY . .
+
+
 COPY . .
 
 RUN apt-get update \
