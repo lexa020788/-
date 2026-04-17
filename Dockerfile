@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN git clone https://github.com/lampac-nextgen/lampac .
 
 # Определение ссылок для загрузки SDK
+# Определение ссылок для загрузки SDK
 RUN case "$BUILDARCH" in \
     arm64) SDK_URL="https://microsoft.com${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
     *) SDK_URL="https://microsoft.com${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; \
@@ -29,6 +30,7 @@ RUN case "$BUILDARCH" in \
     && mkdir -p /out/usr/share/dotnet \
     && tar -xzf /tmp/dotnet-sdk.tar.gz -C /out/usr/share/dotnet \
     && rm /tmp/dotnet-sdk.tar.gz
+
 
 # 3. Сборка с ограничением ресурсов (-p:Parallel=false чтобы не вылететь по памяти)
 RUN case "$TARGETARCH" in \
