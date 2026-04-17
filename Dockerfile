@@ -22,8 +22,8 @@ RUN git clone https://github.com/lampac-nextgen/lampac .
 
 # Проверьте, чтобы после .com был СЛЭШ, а перед переменной знак $
 RUN case "$BUILDARCH" in \
-        arm64) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
-    *) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; \
+        arm64) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
+    *) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; \
     esac \
     && curl -fSL -o /tmp/dotnet-sdk.tar.gz "${SDK_URL}" \
     && mkdir -p /out/usr/share/dotnet \
@@ -62,7 +62,7 @@ RUN case "$(uname -m)" in \
     aarch64) RID=arm64 ;; \
     x86_64) RID=x64 ;; \
     esac \
-    && DOTNET_RUNTIME_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-${RID}.tar.gz" \
+    && DOTNET_RUNTIME_URL="https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-${RID}.tar.gz" \
     && curl -fSL -o /tmp/dotnet-runtime.tar.gz "${DOTNET_RUNTIME_URL}" \
     && mkdir -p /usr/share/dotnet \
     && tar -xzf /tmp/dotnet-runtime.tar.gz -C /usr/share/dotnet \
