@@ -58,21 +58,21 @@ COPY --from=builder /out/lampac /lampac
 # Устанавливаем среду выполнения .NET (Runtime)
 RUN case "$BUILDARCH" in \
     arm64) \
-    DOTNET_SDK_URL="https://builds.dotnet.microsoft.com/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" \
+    DOTNET_SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" \
     ;; \
     amd64) \
-    DOTNET_SDK_URL="https://builds.dotnet.microsoft.com/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" \
+    DOTNET_SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" \
     ;; \
     *) echo "Unsupported BUILDARCH: $BUILDARCH" && exit 1 ;; \
     esac \
     && case "$TARGETARCH" in \
     arm64) \
-    DOTNET_RUNTIME_URL="https://builds.dotnet.microsoft.com/${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-arm64.tar.gz" \
+    DOTNET_RUNTIME_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-arm64.tar.gz" \
     FFMPEG_URL="https://github.com" \
     RID=linux-arm64 \
     ;; \
     amd64) \
-    DOTNET_RUNTIME_URL="https://builds.dotnet.microsoft.com/${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-x64.tar.gz" \
+    DOTNET_RUNTIME_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-x64.tar.gz" \
     FFMPEG_URL="https://github.com" \
     RID=linux-x64 \
     ;; \
