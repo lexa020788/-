@@ -11,9 +11,11 @@ RUN curl -fSL -k -o dotnet.tar.gz https://builds.dotnet.microsoft.com/dotnet/asp
     && tar -oxzf dotnet.tar.gz -C /usr/share/dotnet \
     && rm dotnet.tar.gz
 
-RUN curl -L -k -o publish.zip https://github.com/lampac-talks/lampac/releases/latest/download/publish.zip \
-    && unzip -o publish.zip && rm -f publish.zip && rm -rf merchant \
-    && rm -rf runtimes/os* && rm -rf runtimes/win* && rm -rf runtimes/linux-arm runtimes/linux-arm64 runtimes/linux-musl-arm64 runtimes/linux-musl-x64 \
+RUN curl -L -k -o publish.zip https://github.com \
+    && (unzip -o publish.zip || echo "Ignoring unzip warnings") \
+    && rm -f publish.zip \
+    && rm -rf merchant \
+    && rm -rf runtimes/os* runtimes/win* runtimes/linux-arm runtimes/linux-arm64 runtimes/linux-musl-arm64 runtimes/linux-musl-x64 \
     && touch isdocker
 
 RUN curl -k -s https://raw.githubusercontent.com/lampac-talks/lampac/main/Build/Docker/update.sh | bash
