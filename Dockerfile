@@ -1,140 +1,63 @@
-# Multi-platform Dockerfile for linux/amd64 and linux/arm64
-# Build with: docker buildx build --platform linux/amd64,linux/arm64 -f Dockerfile .
-
 # Global ARGs
 ARG DOTNET_VERSION=10.0.5
 ARG DOTNET_SDK_VERSION=10.0.201
 
-# Builder image — platform set by buildx
-FROM --platform=$BUILDPLATFORM debian:13-slim AS builder
+# Builder image
+FROM debian:13-slim AS builder
 
 ARG BUILDARCH
 ARG TARGETARCH
 ARG DOTNET_VERSION
 ARG DOTNET_SDK_VERSION
 
-RUN mkdir -p /out
-
 WORKDIR /build
 
-RUN apt-get update && apt-get install -y git
+# 1. Устанавливаем git и инструменты (БЕЗ ЭТОГО НЕ ЗАРАБОТАЕТ)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl xz-utils libicu76 git \
+    && rm -rf /var/lib/apt/lists/*
 
-# Клонируем оригинальный репозиторий Lampac в текущую папку
-# Замените ссылку ниже на ту, откуда вы взяли Dockerfile
+# 2. Клонируем исходники Lampac напрямую (так как ваш репозиторий пуст)
 RUN git clone https://github.com .
 
-# Теперь файлы на месте, и мы можем продолжать
-RUN apt-get install -y --no-install-recommends \
-    ca-certificates \
-    curl \
-    libicu76 \
-    xz-utils \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY . .
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    curl \
-    libicu76 \
-    xz-utils \
-    && rm -rf /var/lib/apt/lists/*
-
+# Определение ссылок для загрузки SDK
 RUN case "$BUILDARCH" in \
-    arm64) \
-    DOTNET_SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" \
-    ;; \
-    amd64) \
-    DOTNET_SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" \
-    ;; \
-    *) echo "Unsupported BUILDARCH: $BUILDARCH" && exit 1 ;; \
+    arm64) SDK_URL="https://microsoft.com${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
+    *) SDK_URL="https://microsoft.com${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; \
     esac \
-    && case "$TARGETARCH" in \
-    arm64) \
-    DOTNET_RUNTIME_URL="https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-arm64.tar.gz" \
-    FFMPEG_URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linuxarm64-gpl.tar.xz" \
-    RID=linux-arm64 \
-    ;; \
-    amd64) \
-    DOTNET_RUNTIME_URL="https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-x64.tar.gz" \
-    FFMPEG_URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz" \
-    RID=linux-x64 \
-    ;; \
-    *) echo "Unsupported TARGETARCH: $TARGETARCH" && exit 1 ;; \
-    esac \
-    # SDK — required for dotnet publish
-    && curl -fSL -o /tmp/dotnet-sdk.tar.gz "${DOTNET_SDK_URL}" \
+    && curl -fSL -o /tmp/dotnet-sdk.tar.gz "${SDK_URL}" \
     && mkdir -p /out/usr/share/dotnet \
-    && tar -oxzf /tmp/dotnet-sdk.tar.gz -C /out/usr/share/dotnet \
-    && rm /tmp/dotnet-sdk.tar.gz \
-    # Build the application
-    && DOTNET_CLI_TELEMETRY_OPTOUT=1 /out/usr/share/dotnet/dotnet publish --configuration Release --runtime "$RID" --output /out/lampac -p:PlaywrightPlatform="$RID" Core/Core.csproj \
-    # Replace SDK with ASP.NET Core runtime for the final image
-    && rm -rf /out/usr/share/dotnet \
-    && mkdir -p /out/usr/share/dotnet \
-    && curl -fSL -o /tmp/dotnet-runtime.tar.gz "${DOTNET_RUNTIME_URL}" \
-    && tar -oxzf /tmp/dotnet-runtime.tar.gz -C /out/usr/share/dotnet \
-    && rm /tmp/dotnet-runtime.tar.gz \
-    # FFmpeg & FFprobe — binaries only
-    && curl -fSL -o /tmp/ffmpeg.tar.xz "${FFMPEG_URL}" \
-    && tar -xJf /tmp/ffmpeg.tar.xz -C /tmp \
-    --wildcards "*/bin/ffmpeg" "*/bin/ffprobe" \
-    --strip-components=2 \
-    && mv /tmp/ffmpeg /tmp/ffprobe /out/lampac/data/ \
-    && chmod +x /out/lampac/data/ffmpeg /out/lampac/data/ffprobe \
-    && rm /tmp/ffmpeg.tar.xz \
-    && touch /out/lampac/isdocker
+    && tar -xzf /tmp/dotnet-sdk.tar.gz -C /out/usr/share/dotnet \
+    && rm /tmp/dotnet-sdk.tar.gz
 
-# Runner — OS/arch of the published image (amd64 vs arm64)
+# 3. Сборка с ограничением ресурсов (-p:Parallel=false чтобы не вылететь по памяти)
+RUN case "$TARGETARCH" in \
+    arm64) RID=linux-arm64 ;; \
+    *) RID=linux-x64 ;; \
+    esac \
+    && /out/usr/share/dotnet/dotnet publish --configuration Release --runtime "$RID" \
+    --output /out/lampac -p:PlaywrightPlatform="$RID" -p:Parallel=false Core/Core.csproj
+
+# Runner image
 FROM debian:13-slim AS runner
-
-ARG TARGETARCH
-
-LABEL org.opencontainers.image.description="Lampac NextGen - Media aggregator" \
-    org.opencontainers.image.licenses="MIT" \
-    org.opencontainers.image.source="https://github.com/lampac-nextgen/lampac" \
-    org.opencontainers.image.vendor="Lampac NextGen"
-
-ENV DOTNET_ROOT=/usr/share/dotnet \
-    PATH="${PATH}:/usr/share/dotnet" \
-    DOTNET_RUNNING_IN_CONTAINER=true \
-    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
-    DOTNET_CLI_TELEMETRY_OPTOUT=1 \
-    CHROMIUM_PATH=/usr/bin/chromium \
-    CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage"
-
 WORKDIR /lampac
 EXPOSE 9118
 
-# Runtime dependencies
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    chromium \
-    curl \
-    fontconfig \
-    libicu76 \
-    libnspr4 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* \
-    && rm -rf \
-    /usr/share/doc \
-    /usr/share/man \
-    /usr/share/info \
-    /usr/share/common-licenses
+ENV DOTNET_ROOT=/usr/share/dotnet \
+    PATH="${PATH}:/usr/share/dotnet" \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
-# Create non-root user before COPY to use --chown
-RUN groupadd -r -g 1000 lampac \
-    && useradd -r -u 1000 -g lampac -d /lampac lampac
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates chromium curl fontconfig libicu76 libnspr4 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Copy application
-COPY --chown=lampac:lampac --from=builder /out /
+# Копируем результат сборки
+COPY --from=builder /out/lampac /lampac
 
-# Health check — verify process is running
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD pgrep -x dotnet || exit 1
+# Устанавливаем среду выполнения .NET (Runtime)
+RUN curl -fSL -o /tmp/dotnet-runtime.tar.gz "https://microsoft.com" \
+    && mkdir -p /usr/share/dotnet \
+    && tar -xzf /tmp/dotnet-runtime.tar.gz -C /usr/share/dotnet \
+    && rm /tmp/dotnet-runtime.tar.gz
 
-USER lampac
-
-ENTRYPOINT ["/usr/share/dotnet/dotnet", "Core.dll"]
+ENTRYPOINT ["dotnet", "Core.dll"]
