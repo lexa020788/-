@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Клонируем исходники Lampac напрямую (так как ваш репозиторий пуст)
-RUN git clone https://github.com .
+RUN git clone https://github.com/lampac-nextgen/lampac .
 
 # Определение ссылок для загрузки SDK
 RUN case "$BUILDARCH" in \
