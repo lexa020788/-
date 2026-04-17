@@ -47,7 +47,6 @@ EXPOSE 9118
 ENV DOTNET_ROOT=/usr/share/dotnet \
     PATH="${PATH}:/usr/share/dotnet" \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
-    CHROMIUM_PATH=/usr/bin/chromium
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates chromium curl fontconfig libicu76 libnspr4 \
