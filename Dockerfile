@@ -48,6 +48,7 @@ ENV DOTNET_ROOT=/usr/share/dotnet
 ENV PATH="${PATH}:/usr/share/dotnet"
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 ENV CHROMIUM_PATH=/usr/bin/chromium
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates chromium curl fontconfig libicu76 libnspr4 \
