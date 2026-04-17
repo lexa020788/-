@@ -54,33 +54,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Копируем результат сборки
 COPY --from=builder /out/lampac /lampac
+# 1. Переходим в папку приложения
+WORKDIR /lampac
 
-# Устанавливаем среду выполнения .NET (Runtime)
-RUN case "$BUILDARCH" in \
-    arm64) \
-    DOTNET_SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" \
-    ;; \
-    amd64) \
-    DOTNET_SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" \
-    ;; \
-    *) echo "Unsupported BUILDARCH: $BUILDARCH" && exit 1 ;; \
+# 2. Скачиваем и устанавливаем ТОЛЬКО Runtime (среду запуска), а не тяжелый SDK
+RUN case "$(uname -m)" in \
+    aarch64) RID=arm64 ;; \
+    x86_64) RID=x64 ;; \
     esac \
-    && case "$TARGETARCH" in \
-    arm64) \
-    DOTNET_RUNTIME_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-arm64.tar.gz" \
-    FFMPEG_URL="https://github.com" \
-    RID=linux-arm64 \
-    ;; \
-    amd64) \
-    DOTNET_RUNTIME_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-x64.tar.gz" \
-    FFMPEG_URL="https://github.com" \
-    RID=linux-x64 \
-    ;; \
-    *) echo "Unsupported TARGETARCH: $TARGETARCH" && exit 1 ;; \
-    esac \
-    && curl -fSL -o /tmp/dotnet-sdk.tar.gz "${DOTNET_SDK_URL}" \
-    && mkdir -p /out/usr/share/dotnet \
-    && tar -xzf /tmp/dotnet-sdk.tar.gz -C /out/usr/share/dotnet \
-    && rm /tmp/dotnet-sdk.tar.gz
+    && DOTNET_RUNTIME_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-${RID}.tar.gz" \
+    && curl -fSL -o /tmp/dotnet-runtime.tar.gz "${DOTNET_RUNTIME_URL}" \
+    && mkdir -p /usr/share/dotnet \
+    && tar -xzf /tmp/dotnet-runtime.tar.gz -C /usr/share/dotnet \
+    && rm /tmp/dotnet-runtime.tar.gz
 
+# 3. Настраиваем переменные окружения, чтобы система видела dotnet
+ENV DOTNET_ROOT=/usr/share/dotnet \
+    PATH="/usr/share/dotnet:${PATH}"
+
+# 4. Проверяем наличие файла и запускаем
+RUN touch /lampac/isdocker
 ENTRYPOINT ["dotnet", "Core.dll"]
