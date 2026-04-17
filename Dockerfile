@@ -62,7 +62,7 @@ RUN case "$(uname -m)" in \
     aarch64) RID=arm64 ;; \
     x86_64) RID=x64 ;; \
     esac \
-    && DOTNET_RUNTIME_URL="https://builds.dotnet.microsoft.comdotnet/aspnetcore/Runtime/10.0.0/${RID}.tar.gz" \
+    && DOTNET_RUNTIME_URL="https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/10.0.0/${RID}.tar.gz" \
     && curl -fSL -o /tmp/dotnet-runtime.tar.gz "${DOTNET_RUNTIME_URL}" \
     && mkdir -p /usr/share/dotnet \
     && tar -xzf /tmp/dotnet-runtime.tar.gz -C /usr/share/dotnet \
