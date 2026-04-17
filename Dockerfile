@@ -20,12 +20,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 2. Клонируем исходники Lampac напрямую (так как ваш репозиторий пуст)
 RUN git clone https://github.com/lampac-nextgen/lampac .
 
-# Определение ссылок для загрузки SDK
-# Определение ссылок для загрузки SDK
-# Определение ссылок для загрузки SDK
+# Проверьте, чтобы после .com был СЛЭШ, а перед переменной знак $
 RUN case "$BUILDARCH" in \
-    arm64) SDK_URL="https://microsoft.com{DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
-    *) SDK_URL="https://microsoft.com{DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; \
+    arm64) SDK_URL="https://microsoft.com${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
+    *) SDK_URL="https://microsoft.com${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; \
     esac \
     && curl -fSL -o /tmp/dotnet-sdk.tar.gz "${SDK_URL}" \
     && mkdir -p /out/usr/share/dotnet \
@@ -58,9 +56,31 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /out/lampac /lampac
 
 # Устанавливаем среду выполнения .NET (Runtime)
-RUN curl -fSL -o /tmp/dotnet-runtime.tar.gz "https://microsoft.com" \
-    && mkdir -p /usr/share/dotnet \
-    && tar -xzf /tmp/dotnet-runtime.tar.gz -C /usr/share/dotnet \
-    && rm /tmp/dotnet-runtime.tar.gz
+RUN case "$BUILDARCH" in \
+    arm64) \
+    DOTNET_SDK_URL="https://microsoft.com${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" \
+    ;; \
+    amd64) \
+    DOTNET_SDK_URL="https://microsoft.com${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" \
+    ;; \
+    *) echo "Unsupported BUILDARCH: $BUILDARCH" && exit 1 ;; \
+    esac \
+    && case "$TARGETARCH" in \
+    arm64) \
+    DOTNET_RUNTIME_URL="https://microsoft.com${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-arm64.tar.gz" \
+    FFMPEG_URL="https://github.com" \
+    RID=linux-arm64 \
+    ;; \
+    amd64) \
+    DOTNET_RUNTIME_URL="https://microsoft.com${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-x64.tar.gz" \
+    FFMPEG_URL="https://github.com" \
+    RID=linux-x64 \
+    ;; \
+    *) echo "Unsupported TARGETARCH: $TARGETARCH" && exit 1 ;; \
+    esac \
+    && curl -fSL -o /tmp/dotnet-sdk.tar.gz "${DOTNET_SDK_URL}" \
+    && mkdir -p /out/usr/share/dotnet \
+    && tar -xzf /tmp/dotnet-sdk.tar.gz -C /out/usr/share/dotnet \
+    && rm /tmp/dotnet-sdk.tar.gz
 
 ENTRYPOINT ["dotnet", "Core.dll"]
