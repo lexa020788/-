@@ -17,13 +17,19 @@ RUN mkdir -p /out
 
 WORKDIR /build
 
-# Копируем конкретную папку, игнорируя настройки .dockerignore для неё
-COPY Core/ ./Core/
-COPY Shared/ ./Shared/
-COPY Modules/ ./Modules/
-# Если есть другие важные папки, добавьте их так же
-COPY . .
+RUN apt-get update && apt-get install -y git
 
+# Клонируем оригинальный репозиторий Lampac в текущую папку
+# Замените ссылку ниже на ту, откуда вы взяли Dockerfile
+RUN git clone https://github.com .
+
+# Теперь файлы на месте, и мы можем продолжать
+RUN apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    libicu76 \
+    xz-utils \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY . .
 
