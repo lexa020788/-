@@ -47,17 +47,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates chromium curl fontconfig libicu72 libnspr4 libnss3 \
     libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxcomposite1 \
     libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libasound2 \
+    && mkdir -p /lampac/Core/data \
     && ln -sf /usr/bin/chromium /usr/bin/chromium-browser \
+    && ln -sf /usr/bin/chromium /lampac/chromium \
+    && ln -sf /usr/bin/chromium /lampac/Core/data/chromium \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ENV ASPNETCORE_URLS=http://0.0.0 \
     DOTNET_RUNNING_IN_CONTAINER=true \
-    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    # Пути для Chromium
     CHROMIUM_PATH=/usr/bin/chromium \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
     PLAYWRIGHT_BROWSERS_PATH=0 \
-    CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu"
-
+    # Флаги для запуска в Docker
+    CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu --headless"
 
 # Копируем результат сборки
 COPY --from=builder /out/lampac /lampac
