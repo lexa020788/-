@@ -1,6 +1,6 @@
 # Global ARGs
-ARG DOTNET_VERSION=9.0.0
-ARG DOTNET_SDK_VERSION=9.0.100
+ARG DOTNET_VERSION=10.0.0
+ARG DOTNET_SDK_VERSION=10.0.201
 
 # --- Builder Stage ---
 FROM debian:13-slim AS builder
@@ -9,20 +9,12 @@ ARG TARGETARCH
 ARG DOTNET_SDK_VERSION
 WORKDIR /build
 
-# Вместо RUN RUN apt-get...
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl xz-utils git libicu76 && rm -rf /var/lib/apt/lists/*
+    ca-certificates curl xz-utils libicu76 git \
+    && rm -rf /var/lib/apt/lists/*
 
-# Клонируем и жестко адаптируем код под .NET 9
-RUN git clone https://github.com/lampac-nextgen/lampac . \
-    && find . -name "*.csproj" -exec sed -i 's/<TargetFramework>net10.0<\/TargetFramework>/<TargetFramework>net9.0<\/TargetFramework>/g' {} + \
-    && find . -name "*.csproj" -exec sed -i 's/Version="10.0.2"/Version="9.0.0"/g' {} + \
-    && find . -name "*.csproj" -exec sed -i 's/Version="10.0.0"/Version="9.0.0"/g' {} + \
-    && sed -i '/KnownIPNetworks/d' Core/Startup.cs \
-    && sed -i '/KnownNetworks/d' Core/Startup.cs \
-    && sed -i '/IPNetwork/d' Core/Startup.cs
+RUN git clone https://github.com/lampac-nextgen/lampac .
 
-# Установка SDK
 RUN case "$BUILDARCH" in \
     arm64) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
     *) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; \
@@ -32,56 +24,45 @@ RUN case "$BUILDARCH" in \
     && tar -xzf /tmp/dotnet-sdk.tar.gz -C /usr/share/dotnet \
     && rm /tmp/dotnet-sdk.tar.gz
 
-# Публикация
 RUN case "$TARGETARCH" in \
     arm64) RID=linux-arm64 ;; \
     *) RID=linux-x64 ;; \
     esac \
-    && /usr/share/dotnet/dotnet publish Core/Core.csproj --configuration Release --runtime "$RID" \
-    --output /out/lampac -p:Parallel=false --self-contained false
+    && /usr/share/dotnet/dotnet publish --configuration Release --runtime "$RID" \
+    --output /out/lampac -p:Parallel=false Core/Core.csproj
 
 # --- Runner Stage ---
 FROM debian:13-slim AS runner
 ARG TARGETARCH
-ARG DOTNET_VERSION
 WORKDIR /lampac
 EXPOSE 9118
 
-# ПРАВИЛЬНОЕ ЗАДАНИЕ ПЕРЕМЕННЫХ
-ENV DOTNET_GCHeapHardLimit=200000000 \
-    DOTNET_ROOT=/usr/share/dotnet \
+# Лимиты для стабильности на 512MB
+ENV DOTNET_ROOT=/usr/share/dotnet \
     PATH="${PATH}:/usr/share/dotnet" \
-    ASPNETCORE_URLS=http://0.0.0 \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
     DOTNET_RUNNING_IN_CONTAINER=true \
-    CHROMIUM_PATH=/usr/bin/chromium \
-    CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu --single-process --no-zygote"
+    DOTNET_GCHeapHardLimit=400000000
 
+# Устанавливаем только системные либы (БЕЗ CHROMIUM)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates chromium curl fontconfig libicu76 libnspr4 libnss3 libgbm1 \
+    ca-certificates curl fontconfig libicu76 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Копируем приложение
 COPY --from=builder /out/lampac /lampac
 
-# Установка Runtime 9.0
+# Установка Runtime
 RUN case "$TARGETARCH" in \
     arm64) RID=arm64 ;; \
     *) RID=x64 ;; \
     esac \
-    && DOTNET_RUNTIME_URL="https://builds.dotnet.microsoft.com/${DOTNET_VERSION}/aspnetcore-runtime-${DOTNET_VERSION}-linux-${RID}.tar.gz" \
+    && DOTNET_RUNTIME_URL="https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/10.0.0/aspnetcore-runtime-10.0.0-linux-${RID}.tar.gz" \
     && curl -fSL -o /tmp/dotnet-runtime.tar.gz "${DOTNET_RUNTIME_URL}" \
     && mkdir -p /usr/share/dotnet \
     && tar -xzf /tmp/dotnet-runtime.tar.gz -C /usr/share/dotnet \
     && rm /tmp/dotnet-runtime.tar.gz
 
-# Создаем конфиг
-RUN echo '{ \
-  "listen": {"port": 9118, "KnownProxies": [{"ip": "0.0.0.0", "prefixLength": 0}]}, \
-  "chromium": {"enable": true, "binary": "/usr/bin/chromium", "args": ["--no-sandbox", "--disable-setuid-sandbox", "--single-process"]}, \
-  "WAF": {"allowExternalIpAccess": true}, \
-  "GC": {"Concurrent": true, "HighMemoryPercent": 70} \
-}' > /lampac/init.conf
-
-RUN touch /lampac/isdocker
+# Конфиг: chromium: false
+RUN echo '{"listen":{"port":9118},"KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}],"chromium":{"enable":false}}' > /lampac/init.conf
 
 ENTRYPOINT ["dotnet", "Core.dll", "--urls", "http://0.0.0.0:9118"]
