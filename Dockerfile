@@ -69,4 +69,4 @@ WORKDIR /lampac
 
 RUN echo '{"listen":{"port":9118},"KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}],"chromium":{"enable":true}}' > /lampac/init.conf
 
-ENTRYPOINT ["dotnet", "Core.dll", "--urls", "http://0.0.0"]
+ENTRYPOINT ["dotnet", "Core.dll", "--urls", "http://0.0.0.0:9118"]
