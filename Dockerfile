@@ -66,6 +66,6 @@ RUN case "$TARGETARCH" in \
     && rm /tmp/dotnet-runtime.tar.gz
 
 # Финальный штрих: создаем метку и даем права (как у разработчика)
-RUN touch /lampac/isdocker && chmod +x /usr/bin/chromium
+RUN echo '{"listen":{"port":9118},"KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}],"chromium":{"enable":true}}' > /lampac/init.conf
 
 ENTRYPOINT ["dotnet", "Core.dll", "--urls", "http://0.0.0"]
