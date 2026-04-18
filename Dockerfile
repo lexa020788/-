@@ -44,25 +44,24 @@ FROM debian:12-slim AS runner
 WORKDIR /lampac
 EXPOSE 9118
 
-# Устанавливаем зависимости для запуска браузера
+# 1. Устанавливаем только библиотеки (без самого chromium)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates chromium curl fontconfig libicu72 libnspr4 libnss3 \
+    ca-certificates curl fontconfig libicu72 libnspr4 libnss3 \
     libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxcomposite1 \
     libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libasound2 \
-    && ln -s /usr/bin/chromium /usr/bin/chromium-browser || true \
-    && ln -s /usr/bin/chromium /lampac/chromium || true \
-    && chmod +x /usr/bin/chromium \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Вместо установки пакета chromium через apt, просим Playwright скачать его в нужную папку
-RUN /usr/share/dotnet/dotnet build-server shutdown || true \
-    && /usr/share/dotnet/dotnet publish -c Release -r linux-x64 --output /lampac Core/Core.csproj || true
+# 2. Скачиваем Chromium вручную прямо в папку приложения
+RUN curl -fSL -o /tmp/chromium.tar.gz "https://github.com" \
+    && tar -xzf /tmp/chromium.tar.gz -C /lampac \
+    && rm /tmp/chromium.tar.gz \
+    && chmod +x /lampac/chrome-linux/chrome
 
 # Явно указываем путь к браузеру внутри папки приложения
-ENV CHROMIUM_PATH=/lampac/chrome-linux/chrome \
+ENV ASPNETCORE_URLS=http://+:9118 \
+    CHROMIUM_PATH=/lampac/chrome-linux/chrome \
     PUPPETEER_EXECUTABLE_PATH=/lampac/chrome-linux/chrome \
     CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage"
-
 
 # Копируем результат сборки
 COPY --from=builder /out/lampac /lampac
