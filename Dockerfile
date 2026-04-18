@@ -13,35 +13,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl xz-utils libicu76 git \
     && rm -rf /var/lib/apt/lists/*
 
-RUN git clone https://github.com/lampac-nextgen/lampac . \
-    && rm -rf Plugins/SISI
-
-# ... (начало как было)
-
-# Сборка
-RUN RID=$([ "$TARGETARCH" = "arm64" ] && echo "linux-arm64" || echo "linux-x64") \
-    && dotnet publish Core/Core.csproj --configuration Release --runtime "$RID" --output /out/lampac \
-    && cp Core/bin/Release/net10.0/$RID/playwright.sh /out/lampac/playwright.sh || true
-
-# --- Runner image ---
-FROM debian:13-slim AS runner
-# ... (установка apt-get как у вас)
-
+# Установка .NET SDK
+RUN case "$BUILDARCH" in \
+    arm64) SDK_URL="https://microsoft.com{DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
+    *) SDK_URL="https://microsoft.com{DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; \
+    esac \
+    && curl -fSL -o /tmp/dotnet-sdk.tar.gz "${SDK_URL}" \
+    && mkdir -p /usr/share/dotnet \
+    && tar -xzf /tmp/dotnet-sdk.tar.gz -C /usr/share/dotnet \
+    && rm /tmp/dotnet-sdk.tar.gz
 
 ENV PATH="${PATH}:/usr/share/dotnet"
 
-# Сборка + установка Playwright (как у разработчика)
-# ... (начало как у вас)
+# Клонирование и сборка
+RUN git clone https://github.com/lampac-nextgen/lampac . \
+    && rm -rf Plugins/SISI
 
-# Сборка
 RUN RID=$([ "$TARGETARCH" = "arm64" ] && echo "linux-arm64" || echo "linux-x64") \
-    && dotnet publish Core/Core.csproj --configuration Release --runtime "$RID" --output /out/lampac \
-    && dotnet build Core/Core.csproj --configuration Release --runtime "$RID"
-
-# Установка Playwright (выносим отдельно для отладки)
-# Указываем переменную окружения, чтобы браузеры скачались в конкретную папку
-ENV PLAYWRIGHT_BROWSERS_PATH=/out/lampac/cache
-RUN dotnet exec /out/lampac/Microsoft.Playwright.dll install chromium
+    && dotnet publish Core/Core.csproj --configuration Release --runtime "$RID" --output /out/lampac
 
 # --- Runner image ---
 FROM debian:13-slim AS runner
@@ -56,32 +45,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && locale-gen \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Копируем только само приложение
 COPY --from=builder /out/lampac /lampac
-# Копируем кэш браузера из билдера
-COPY --from=builder /out/lampac/cache /root/.cache
 
-# Единый блок ENV без разрывов
-ENV DOTNET_ROOT=/usr/share/dotnet \
-    PATH="${PATH}:/usr/share/dotnet" \
-    ASPNETCORE_URLS=http://+:9118 \
+ENV ASPNETCORE_URLS=http://+:9118 \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
     LANG=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8 \
+    # Используем системный Chromium вместо скачивания внутри Playwright
     CHROME_EXECUTABLE_PATH=/usr/bin/chromium \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
-    PLAYWRIGHT_BROWSERS_PATH=/lampac/cache \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
     SISI_enable=false \
     SISI_all=false
 
-RUN case "$(uname -m)" in \
-    aarch64) RID=arm64 ;; \
-    x86_64) RID=x64 ;; \
-    esac \
-    && DOTNET_RUNTIME_URL="https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/10.0.0/aspnetcore-runtime-10.0.0-linux-${RID}.tar.gz" \
-    && curl -fSL -o /tmp/dotnet-runtime.tar.gz "${DOTNET_RUNTIME_URL}" \
-    && mkdir -p /usr/share/dotnet \
-    && tar -xzf /tmp/dotnet-runtime.tar.gz -C /usr/share/dotnet \
-    && rm /tmp/dotnet-runtime.tar.gz
-
-RUN touch /lampac/isdocker
-ENTRYPOINT ["dotnet", "Core.dll"]
+# Запуск приложения (примерный, проверьте имя выходного файла)
+ENTRYPOINT ["./Core"]
