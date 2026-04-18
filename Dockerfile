@@ -28,8 +28,9 @@ RUN case "$TARGETARCH" in \
     arm64) RID=linux-arm64 ;; \
     *) RID=linux-x64 ;; \
     esac \
-    && /out/usr/share/dotnet/dotnet publish --configuration Release --runtime "$RID" \
-    --output /out/lampac -p:PlaywrightPlatform="$RID" -p:Parallel=false Core/Core.csproj
+    && /out/usr/share/dotnet/dotnet publish Core/Core.csproj --configuration Release --runtime "$RID" \
+    --output /out/lampac -p:PlaywrightPlatform="$RID" -p:Parallel=false \
+    -p:TargetFramework=net9.0 --self-contained false
 
 # --- Runner Stage ---
 FROM debian:13-slim AS runner
