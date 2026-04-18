@@ -33,9 +33,11 @@ RUN case "$TARGETARCH" in \
     *) RID=linux-x64 ;; \
     esac \
     && dotnet publish Core/Core.csproj --configuration Release --runtime "$RID" --output /out/lampac \
-    # Установка драйверов Playwright, чтобы появилась папка .cache
-    && dotnet build Core/Core.csproj \
-    && ./bin/Release/net10.0/$RID/playwright.ps1 install --with-deps \ 
+    # Используем dotnet tool или прямой вызов библиотеки, это надежнее путей к .ps1
+    && dotnet build Core/Core.csproj --configuration Release --runtime "$RID" \
+    && cp Core/bin/Release/net10.0/$RID/playwright.sh /out/lampac/playwright.sh || true \
+    # Вызов установки через dotnet (путь может отличаться, проверьте где лежит Microsoft.Playwright.dll)
+    && dotnet exec /out/lampac/Microsoft.Playwright.dll install --with-deps \
     && cp -r /root/.cache /out/lampac/cache
 
 # --- Runner image ---
