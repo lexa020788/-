@@ -64,8 +64,6 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-...
-
 # Копируем результат сборки
 COPY --from=builder /out/lampac /lampac
 # 1. Переходим в папку приложения
