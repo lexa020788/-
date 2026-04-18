@@ -16,14 +16,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN git clone https://github.com/lampac-nextgen/lampac . \
     && rm -rf Plugins/SISI
 
-RUN case "$BUILDARCH" in \
-    arm64) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
-    *) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; \
-    esac \
-    && curl -fSL -o /tmp/dotnet-sdk.tar.gz "${SDK_URL}" \
-    && mkdir -p /usr/share/dotnet \
-    && tar -xzf /tmp/dotnet-sdk.tar.gz -C /usr/share/dotnet \
-    && rm /tmp/dotnet-sdk.tar.gz
+# ... (начало как было)
+
+# Сборка
+RUN RID=$([ "$TARGETARCH" = "arm64" ] && echo "linux-arm64" || echo "linux-x64") \
+    && dotnet publish Core/Core.csproj --configuration Release --runtime "$RID" --output /out/lampac \
+    && cp Core/bin/Release/net10.0/$RID/playwright.sh /out/lampac/playwright.sh || true
+
+# --- Runner image ---
+FROM debian:13-slim AS runner
+# ... (установка apt-get как у вас)
+
 
 ENV PATH="${PATH}:/usr/share/dotnet"
 
