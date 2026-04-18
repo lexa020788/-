@@ -44,7 +44,10 @@ FROM debian:12-slim AS runner
 WORKDIR /lampac
 EXPOSE 9118
 
-ENV CHROMIUM_PATH=/usr/bin/chromium \
+ENV ASPNETCORE_URLS=http://0.0.0 \
+    DOTNET_RUNNING_IN_CONTAINER=true \
+    DOTNET_USE_POLLING_FILE_WATCHER=true \
+    CHROMIUM_PATH=/usr/bin/chromium \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
     CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu"
 
@@ -69,6 +72,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpango-1.0-0 \
     libasound2 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN ln -s /usr/bin/chromium /usr/bin/chromium-browser || true \
+    && ln -s /usr/bin/chromium /lampac/chromium || true
+ 
+
 # Копируем результат сборки
 COPY --from=builder /out/lampac /lampac
 # 1. Переходим в папку приложения
