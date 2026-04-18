@@ -54,6 +54,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Копируем приложение
+# ... (всё, что выше копирования приложения, оставляем как есть)
+
+# Копируем приложение
 COPY --from=builder /out/lampac /lampac
 
 # Установка Runtime (твоя рабочая схема)
@@ -69,6 +72,11 @@ RUN case "$TARGETARCH" in \
 
 WORKDIR /lampac
 
-RUN echo '{"listen":{"port":9118},"KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}],"chromium":{"enable":true}}' > /lampac/init.conf
+# Создаем конфиг с разрешением внешнего доступа и путем к хрому
+RUN echo '{"listen":{"port":9118},"KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}],"chromium":{"enable":true,"binary":"/usr/bin/chromium"},"WAF":{"allowExternalIpAccess":true}}' > /lampac/init.conf
 
-ENTRYPOINT ["dotnet", "Core.dll", "--urls", "http://0.0.0.0:9118"]
+# Права и метка докера
+RUN chmod +x /usr/bin/chromium && touch /lampac/isdocker
+
+# Запуск с полным путем
+ENTRYPOINT ["/usr/share/dotnet/dotnet", "Core.dll", "--urls", "http://0.0.0.0:9118"]
