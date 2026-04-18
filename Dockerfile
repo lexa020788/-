@@ -46,9 +46,12 @@ EXPOSE 9118
 
 # Устанавливаем зависимости для запуска браузера
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl fontconfig libicu72 libnspr4 libnss3 \
+    ca-certificates chromium curl fontconfig libicu72 libnspr4 libnss3 \
     libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxcomposite1 \
     libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libasound2 \
+    && ln -s /usr/bin/chromium /usr/bin/chromium-browser || true \
+    && ln -s /usr/bin/chromium /lampac/chromium || true \
+    && chmod +x /usr/bin/chromium \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Вместо установки пакета chromium через apt, просим Playwright скачать его в нужную папку
