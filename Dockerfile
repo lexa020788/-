@@ -2,79 +2,64 @@
 ARG DOTNET_VERSION=10.0.0
 ARG DOTNET_SDK_VERSION=10.0.201
 
-# Builder image
+# --- Builder image ---
 FROM debian:13-slim AS builder
-
-ARG BUILDARCH
 ARG TARGETARCH
-ARG DOTNET_VERSION
 ARG DOTNET_SDK_VERSION
-
 WORKDIR /build
 
-# 1. Устанавливаем git и инструменты (БЕЗ ЭТОГО НЕ ЗАРАБОТАЕТ)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl xz-utils libicu76 git \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Клонируем исходники Lampac напрямую (так как ваш репозиторий пуст)
 RUN git clone https://github.com/lampac-nextgen/lampac .
 
-# Проверьте, чтобы после .com был СЛЭШ, а перед переменной знак $
-RUN case "$BUILDARCH" in \
-        arm64) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
-    *) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; \
+# Установка SDK
+RUN case "$TARGETARCH" in \
+    arm64) SDK_ARCH="arm64" ;; \
+    *) SDK_ARCH="x64" ;; \
     esac \
-    && curl -fSL -o /tmp/dotnet-sdk.tar.gz "${SDK_URL}" \
-    && mkdir -p /out/usr/share/dotnet \
-    && tar -xzf /tmp/dotnet-sdk.tar.gz -C /out/usr/share/dotnet \
+    && curl -fSL -o /tmp/dotnet-sdk.tar.gz "https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-${SDK_ARCH}.tar.gz" \
+    && mkdir -p /usr/share/dotnet \
+    && tar -xzf /tmp/dotnet-sdk.tar.gz -C /usr/share/dotnet \
     && rm /tmp/dotnet-sdk.tar.gz
 
+ENV PATH="${PATH}:/usr/share/dotnet"
 
-# 3. Сборка с ограничением ресурсов (-p:Parallel=false чтобы не вылететь по памяти)
+# Сборка (Release)
 RUN case "$TARGETARCH" in \
     arm64) RID=linux-arm64 ;; \
     *) RID=linux-x64 ;; \
     esac \
-    && /out/usr/share/dotnet/dotnet publish --configuration Release --runtime "$RID" \
-    --output /out/lampac -p:PlaywrightPlatform="$RID" -p:Parallel=false Core/Core.csproj
+    && dotnet publish Core/Core.csproj --configuration Release --runtime "$RID" \
+    --output /out/lampac --self-contained false -p:Parallel=false
 
-# Runner image
+# --- Runner image ---
 FROM debian:13-slim AS runner
 WORKDIR /lampac
-EXPOSE 9118
 
-ENV DOTNET_ROOT=/usr/share/dotnet
-ENV PATH="${PATH}:/usr/share/dotnet"
-ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
-ENV CHROMIUM_PATH=/usr/bin/chromium
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-
+# Установка зависимостей для .NET и Playwright (Chromium)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates chromium curl fontconfig libicu76 libnspr4 \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    ca-certificates curl libicu76 libnss3 libnspr4 libatk1.0-0 \
+    libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 \
+    libxdamage1 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Копируем результат сборки
 COPY --from=builder /out/lampac /lampac
-# 1. Переходим в папку приложения
-WORKDIR /lampac
+COPY --from=builder /usr/share/dotnet /usr/share/dotnet
 
-# 2. Скачиваем и устанавливаем ТОЛЬКО Runtime (среду запуска), а не тяжелый SDK
-RUN case "$(uname -m)" in \
-    aarch64) RID=arm64 ;; \
-    x86_64) RID=x64 ;; \
-    esac \
-    && DOTNET_RUNTIME_URL="https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/10.0.0/aspnetcore-runtime-10.0.0-linux-${RID}.tar.gz" \
-    && curl -fSL -o /tmp/dotnet-runtime.tar.gz "${DOTNET_RUNTIME_URL}" \
-    && mkdir -p /usr/share/dotnet \
-    && tar -xzf /tmp/dotnet-runtime.tar.gz -C /usr/share/dotnet \
-    && rm /tmp/dotnet-runtime.tar.gz
-
-
-# 3. Настраиваем переменные окружения, чтобы система видела dotnet
+# Настройки среды
 ENV DOTNET_ROOT=/usr/share/dotnet \
-    PATH="/usr/share/dotnet:${PATH}"
+    PATH="/usr/share/dotnet:${PATH}" \
+    ASPNETCORE_URLS=http://+:9118 \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    LC_ALL=en_US.UTF-8
 
-# 4. Проверяем наличие файла и запускаем
-RUN touch /lampac/isdocker
+# Создаем маркер докера
+RUN touch isdocker
+
+# Открываем порт
+EXPOSE 9118
+
 ENTRYPOINT ["dotnet", "Core.dll"]
