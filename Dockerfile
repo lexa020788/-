@@ -65,7 +65,8 @@ RUN case "$TARGETARCH" in \
     && tar -xzf /tmp/dotnet-runtime.tar.gz -C /usr/share/dotnet \
     && rm /tmp/dotnet-runtime.tar.gz
 
-# Финальный штрих: создаем метку и даем права (как у разработчика)
+WORKDIR /lampac
+
 RUN echo '{"listen":{"port":9118},"KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}],"chromium":{"enable":true}}' > /lampac/init.conf
 
 ENTRYPOINT ["dotnet", "Core.dll", "--urls", "http://0.0.0"]
