@@ -56,8 +56,9 @@ ENV DOTNET_ROOT=/usr/share/dotnet \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
     LANG=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8 \
-    CHROMIUM_PATH=/usr/bin/chromium \
+    CHROME_EXECUTABLE_PATH=/usr/bin/chromium \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
+
     # Эти строки отключают SISI полностью:
     SISI_enable=false \
     SISI_all=false
