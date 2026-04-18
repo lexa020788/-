@@ -68,4 +68,4 @@ RUN case "$TARGETARCH" in \
 # Финальный штрих: создаем метку и даем права (как у разработчика)
 RUN touch /lampac/isdocker && chmod +x /usr/bin/chromium
 
-ENTRYPOINT ["dotnet", "Core.dll", "--urls", "http://0.0.0"]
+ENTRYPOINT ["dotnet", "Core.dll", "--urls", "http://0.0.0.0:8080"]
