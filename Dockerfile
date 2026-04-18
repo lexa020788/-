@@ -28,17 +28,17 @@ RUN case "$BUILDARCH" in \
 ENV PATH="${PATH}:/usr/share/dotnet"
 
 # Сборка + установка Playwright (как у разработчика)
-RUN case "$TARGETARCH" in \
-    arm64) RID=linux-arm64 ;; \
-    *) RID=linux-x64 ;; \
-    esac \
+# ... (начало как у вас)
+
+# Сборка
+RUN RID=$([ "$TARGETARCH" = "arm64" ] && echo "linux-arm64" || echo "linux-x64") \
     && dotnet publish Core/Core.csproj --configuration Release --runtime "$RID" --output /out/lampac \
-    # Используем dotnet tool или прямой вызов библиотеки, это надежнее путей к .ps1
-    && dotnet build Core/Core.csproj --configuration Release --runtime "$RID" \
-    && cp Core/bin/Release/net10.0/$RID/playwright.sh /out/lampac/playwright.sh || true \
-    # Вызов установки через dotnet (путь может отличаться, проверьте где лежит Microsoft.Playwright.dll)
-    && dotnet exec /out/lampac/Microsoft.Playwright.dll install --with-deps \
-    && cp -r /root/.cache /out/lampac/cache
+    && dotnet build Core/Core.csproj --configuration Release --runtime "$RID"
+
+# Установка Playwright (выносим отдельно для отладки)
+# Указываем переменную окружения, чтобы браузеры скачались в конкретную папку
+ENV PLAYWRIGHT_BROWSERS_PATH=/out/lampac/cache
+RUN dotnet exec /out/lampac/Microsoft.Playwright.dll install chromium
 
 # --- Runner image ---
 FROM debian:13-slim AS runner
