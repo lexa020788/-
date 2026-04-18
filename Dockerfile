@@ -48,7 +48,9 @@ ENV DOTNET_ROOT=/usr/share/dotnet \
 
 # Установка зависимостей ТОЧНО как у разработчика (добавлен libnspr4)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates chromium curl fontconfig libicu76 libnspr4 \
+    ca-certificates chromium curl fontconfig libicu76 libnspr4 libnss3 \
+    libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxcomposite1 \
+    libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libasound2 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Копируем приложение
