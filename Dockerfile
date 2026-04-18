@@ -30,7 +30,6 @@ RUN case "$BUILDARCH" in \
     && tar -xzf /tmp/dotnet-sdk.tar.gz -C /out/usr/share/dotnet \
     && rm /tmp/dotnet-sdk.tar.gz
 
-
 # 3. Сборка с ограничением ресурсов (-p:Parallel=false чтобы не вылететь по памяти)
 RUN case "$TARGETARCH" in \
     arm64) RID=linux-arm64 ;; \
@@ -45,19 +44,20 @@ WORKDIR /lampac
 EXPOSE 9118
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl fontconfig libicu72 libnspr4 libnss3 \
+    ca-certificates chromium curl fontconfig libicu72 libnspr4 libnss3 \
     libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxcomposite1 \
     libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libasound2 \
+    && ln -sf /usr/bin/chromium /usr/bin/chromium-browser \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
-# Команда, которая заставит Playwright скачать Chromium в папку по умолчанию
-RUN /usr/share/dotnet/dotnet build-server shutdown || true
 
-
-ENV ASPNETCORE_URLS=http://+:9118 \
+ENV ASPNETCORE_URLS=http://0.0.0 \
     DOTNET_RUNNING_IN_CONTAINER=true \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
-    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0 \
+    CHROMIUM_PATH=/usr/bin/chromium \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
+    PLAYWRIGHT_BROWSERS_PATH=0 \
     CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu"
+
 
 # Копируем результат сборки
 COPY --from=builder /out/lampac /lampac
