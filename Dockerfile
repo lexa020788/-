@@ -72,6 +72,8 @@ RUN case "$TARGETARCH" in \
 
 WORKDIR /lampac
 
+RUN mkdir -p /lampac/data /lampac/module /lampac/wwwroot
+
 # Создаем конфиг с разрешением внешнего доступа и путем к хрому
 RUN echo '{"listen":{"port":9118},"KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}],"chromium":{"enable":true,"binary":"/usr/bin/chromium"},"WAF":{"allowExternalIpAccess":true}}' > /lampac/init.conf
 
