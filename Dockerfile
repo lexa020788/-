@@ -75,11 +75,12 @@ WORKDIR /lampac
 RUN touch isdocker
 
 # Создаем ссылки заново ПРИ НАЛИЧИИ файлов приложения
+# Создаем ссылки и папку данных корректно
 RUN ln -sf /usr/bin/chromium /usr/bin/chromium-browser && \
     ln -sf /usr/bin/chromium /lampac/chromium && \
-    mkdir -p /lampac/Core/data && \
-    ln -sf /usr/bin/chromium /lampac/Core/data/chromium
-
+    mkdir -p /lampac/data && \
+    ln -sf /usr/bin/chromium /lampac/data/chromium
+    
 # 3. Настраиваем переменные окружения, чтобы система видела dotnet
 ENV DOTNET_ROOT=/usr/share/dotnet \
     PATH="/usr/share/dotnet:${PATH}"
