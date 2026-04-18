@@ -37,12 +37,12 @@ ARG TARGETARCH
 WORKDIR /lampac
 EXPOSE 9118
 
-# Лимиты для стабильности на 512MB
-ENV DOTNET_ROOT=/usr/share/dotnet \
+# Вставь это в секцию FROM debian:13-slim AS runner
+ENV DOTNET_GCHeapHardLimit=300000000 \
+    DOTNET_ROOT=/usr/share/dotnet \
     PATH="${PATH}:/usr/share/dotnet" \
-    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
-    DOTNET_RUNNING_IN_CONTAINER=true \
-    DOTNET_GCHeapHardLimit=400000000
+    ASPNETCORE_URLS=http://0.0.0 \
+    DOTNET_RUNNING_IN_CONTAINER=true
 
 # Устанавливаем только системные либы (БЕЗ CHROMIUM)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -62,7 +62,18 @@ RUN case "$TARGETARCH" in \
     && tar -xzf /tmp/dotnet-runtime.tar.gz -C /usr/share/dotnet \
     && rm /tmp/dotnet-runtime.tar.gz
 
-# Конфиг: chromium: false
-RUN echo '{"listen":{"port":9118},"KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}],"chromium":{"enable":false}}' > /lampac/init.conf
+# Вставь это перед ENTRYPOINT
+RUN echo '{ \
+  "listen": {"port": 9118}, \
+  "KnownProxies": [{"ip": "0.0.0.0", "prefixLength": 0}], \
+  "chromium": {"enable": false}, \
+  "WAF": {"allowExternalIpAccess": true}, \
+  "Online": {"enable": true}, \
+  "SISI": {"enable": false}, \
+  "Anime": {"enable": false}, \
+  "TorrServer": {"enable": false}, \
+  "GC": {"Concurrent": true, "HighMemoryPercent": 85} \
+}' > /lampac/init.conf
+
 
 ENTRYPOINT ["dotnet", "Core.dll", "--urls", "http://0.0.0.0:9118"]
