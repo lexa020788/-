@@ -14,7 +14,7 @@ WORKDIR /build
 
 # 1. Устанавливаем git и инструменты (БЕЗ ЭТОГО НЕ ЗАРАБОТАЕТ)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl xz-utils libicu76 git \
+    ca-certificates curl xz-utils libicu72 git \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Клонируем исходники Lampac напрямую (так как ваш репозиторий пуст)
