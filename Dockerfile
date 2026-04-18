@@ -40,24 +40,18 @@ EXPOSE 9118
 # Добавляем переменные как у разработчика (это ВАЖНО для Chromium)
 ENV DOTNET_ROOT=/usr/share/dotnet \
     PATH="${PATH}:/usr/share/dotnet" \
-    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    ASPNETCORE_URLS=http://0.0.0 \
     DOTNET_RUNNING_IN_CONTAINER=true \
     CHROMIUM_PATH=/usr/bin/chromium \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
     CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage"
 
-# Установка зависимостей ТОЧНО как у разработчика (добавлен libnspr4)
+# Установка зависимостей (добавь libnss3 и libgbm1 — без них Хром на Debian 13 не заведется!)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates chromium curl fontconfig libicu76 libnspr4 libnss3 \
-    libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxcomposite1 \
-    libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libasound2 \
+    ca-certificates chromium curl fontconfig libicu76 libnspr4 libnss3 libgbm1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Копируем приложение
-# ... (всё, что выше копирования приложения, оставляем как есть)
-
-# Копируем приложение
-COPY --from=builder /out/lampac /lampac
+# Копируем приложение (БЕЗ --chown=lampac, работаем от ROOT)
+COPY --from=builder /out /
 
 # Установка Runtime (твоя рабочая схема)
 RUN case "$TARGETARCH" in \
