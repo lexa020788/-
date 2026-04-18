@@ -22,7 +22,7 @@ RUN case "$BUILDARCH" in \
     esac \
     && curl -fSL -o /tmp/dotnet-sdk.tar.gz "${SDK_URL}" \
     && mkdir -p /usr/share/dotnet \
-    && tar -xzf /tmp/dotnet-sdk.tar.gz -C /out/usr/share/dotnet \
+    && tar -xzf /tmp/dotnet-sdk.tar.gz -C /usr/share/dotnet \
     && rm /tmp/dotnet-sdk.tar.gz
 
 ENV PATH="${PATH}:/usr/share/dotnet"
