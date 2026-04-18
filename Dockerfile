@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl xz-utils git && rm -rf /var/lib/apt/lists/*
 
 # Клонируем и жестко адаптируем код под .NET 9
-RUN git clone https://github.com . \
+RUN git clone https://github.com/lampac-nextgen/lampac . \
     && find . -name "*.csproj" -exec sed -i 's/<TargetFramework>net10.0<\/TargetFramework>/<TargetFramework>net9.0<\/TargetFramework>/g' {} + \
     && find . -name "*.csproj" -exec sed -i 's/Version="10.0.2"/Version="9.0.0"/g' {} + \
     && sed -i 's/options.KnownIPNetworks.Add/\/\/options.KnownIPNetworks.Add/g' Core/Startup.cs \
