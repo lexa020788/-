@@ -17,8 +17,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN git clone https://github.com/lampac-nextgen/lampac . \
     && find . -name "*.csproj" -exec sed -i 's/<TargetFramework>net10.0<\/TargetFramework>/<TargetFramework>net9.0<\/TargetFramework>/g' {} + \
     && find . -name "*.csproj" -exec sed -i 's/Version="10.0.2"/Version="9.0.0"/g' {} + \
-    && sed -i 's/KnownIPNetworks/ToString/g' Core/Startup.cs \
-    && sed -i 's/KnownNetworks/ToString/g' Core/Startup.cs
+    && sed -i '/KnownIPNetworks/d' Core/Startup.cs \
+    && sed -i '/KnownNetworks/d' Core/Startup.cs
 
 # Установка SDK
 RUN case "$BUILDARCH" in \
