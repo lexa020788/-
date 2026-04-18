@@ -12,14 +12,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl xz-utils libicu76 git \
     && rm -rf /var/lib/apt/lists/*
 
-RUN git clone https://github.com/lampac-nextgen/lampac .
+RUN git clone https://github.com .
 
 # Установка SDK
 RUN case "$TARGETARCH" in \
     arm64) SDK_ARCH="arm64" ;; \
     *) SDK_ARCH="x64" ;; \
     esac \
-    && curl -fSL -o /tmp/dotnet-sdk.tar.gz "https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-${SDK_ARCH}.tar.gz" \
+    && curl -fSL -o /tmp/dotnet-sdk.tar.gz "https://microsoft.com{DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-${SDK_ARCH}.tar.gz" \
     && mkdir -p /usr/share/dotnet \
     && tar -xzf /tmp/dotnet-sdk.tar.gz -C /usr/share/dotnet \
     && rm /tmp/dotnet-sdk.tar.gz
@@ -38,14 +38,17 @@ RUN case "$TARGETARCH" in \
 FROM debian:13-slim AS runner
 WORKDIR /lampac
 
-# Установка зависимостей для .NET и Playwright (Chromium)
+# Установка зависимостей, ЛОКАЛЕЙ и CHROMIUM
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl libicu76 libnss3 libnspr4 libatk1.0-0 \
     libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 \
     libxdamage1 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2 \
+    locales chromium \
+    && sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
+    && locale-gen \
     && rm -rf /var/lib/apt/lists/*
 
-# Копируем результат сборки
+# Копируем результат сборки и dotnet
 COPY --from=builder /out/lampac /lampac
 COPY --from=builder /usr/share/dotnet /usr/share/dotnet
 
@@ -54,7 +57,11 @@ ENV DOTNET_ROOT=/usr/share/dotnet \
     PATH="/usr/share/dotnet:${PATH}" \
     ASPNETCORE_URLS=http://+:9118 \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
-    LC_ALL=en_US.UTF-8
+    LANG=en_US.UTF-8 \
+    LANGUAGE=en_US:en \
+    LC_ALL=en_US.UTF-8 \
+    CHROME_EXECUTABLE_PATH=/usr/bin/chromium \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 # Создаем маркер докера
 RUN touch isdocker
