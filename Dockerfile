@@ -62,22 +62,23 @@ ENV ASPNETCORE_URLS=http://0.0.0 \
     # Флаги для запуска в Docker
     CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu --headless"
 
+# Сначала удаляем старую папку, если она была создана символическими ссылками ранее
+RUN rm -rf /lampac && mkdir -p /lampac
+
 # Копируем результат сборки
 COPY --from=builder /out/lampac /lampac
+
 # 1. Переходим в папку приложения
-# Переходим в папку и пробуем установить браузер через скрипт (если он есть) или полагаемся на автозапуск
 WORKDIR /lampac
+
+# Создаем файл-метку для докера
 RUN touch isdocker
 
-RUN case "$(uname -m)" in \
-    aarch64) RID=arm64 ;; \
-    x86_64) RID=x64 ;; \
-    esac \
-    && DOTNET_RUNTIME_URL="https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/10.0.0/aspnetcore-runtime-10.0.0-linux-${RID}.tar.gz" \
-    && curl -fSL -o /tmp/dotnet-runtime.tar.gz "${DOTNET_RUNTIME_URL}" \
-    && mkdir -p /usr/share/dotnet \
-    && tar -xzf /tmp/dotnet-runtime.tar.gz -C /usr/share/dotnet \
-    && rm /tmp/dotnet-runtime.tar.gz
+# Создаем ссылки заново ПРИ НАЛИЧИИ файлов приложения
+RUN ln -sf /usr/bin/chromium /usr/bin/chromium-browser && \
+    ln -sf /usr/bin/chromium /lampac/chromium && \
+    mkdir -p /lampac/Core/data && \
+    ln -sf /usr/bin/chromium /lampac/Core/data/chromium
 
 # 3. Настраиваем переменные окружения, чтобы система видела dotnet
 ENV DOTNET_ROOT=/usr/share/dotnet \
