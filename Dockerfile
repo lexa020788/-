@@ -40,7 +40,7 @@ RUN case "$TARGETARCH" in \
     --output /out/lampac -p:PlaywrightPlatform="$RID" -p:Parallel=false Core/Core.csproj
 
 # Runner image
-FROM debian:13-slim AS runner
+FROM debian:12-slim AS runner
 WORKDIR /lampac
 EXPOSE 9118
 
@@ -56,6 +56,14 @@ ENV DOTNET_ROOT=/usr/share/dotnet \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     ca-certificates \
+    chromium \
+    curl \
+    fontconfig \
+    libicu72 \
+    libnspr4 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 ...
 
 # Копируем результат сборки
