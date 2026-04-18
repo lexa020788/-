@@ -46,22 +46,22 @@ EXPOSE 9118
 
 # 1. Устанавливаем только библиотеки (без самого chromium)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl fontconfig libicu72 libnspr4 libnss3 \
+    ca-certificates chromium chromium-common curl fontconfig libicu72 libnspr4 libnss3 \
     libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxcomposite1 \
     libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libasound2 \
+    && ln -sf /usr/bin/chromium /usr/bin/chromium-browser \
+    && ln -sf /usr/bin/chromium /lampac/chromium \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 2. Скачиваем Chromium вручную прямо в папку приложения
-RUN curl -fSL -o /tmp/chromium.tar.gz "https://github.com" \
-    && tar -xzf /tmp/chromium.tar.gz -C /lampac \
-    && rm /tmp/chromium.tar.gz \
-    && chmod +x /lampac/chrome-linux/chrome
 
 # Явно указываем путь к браузеру внутри папки приложения
 ENV ASPNETCORE_URLS=http://+:9118 \
-    CHROMIUM_PATH=/lampac/chrome-linux/chrome \
-    PUPPETEER_EXECUTABLE_PATH=/lampac/chrome-linux/chrome \
-    CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage"
+    DOTNET_RUNNING_IN_CONTAINER=true \
+    CHROMIUM_PATH=/usr/bin/chromium \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
+    PLAYWRIGHT_BROWSERS_PATH=0 \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+    CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu --headless"
 
 # Копируем результат сборки
 COPY --from=builder /out/lampac /lampac
