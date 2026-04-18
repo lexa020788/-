@@ -3,7 +3,7 @@ ARG DOTNET_VERSION=10.0.0
 ARG DOTNET_SDK_VERSION=10.0.201
 
 # Builder image
-FROM debian:13-slim AS builder
+FROM debian:12-slim AS builder
 
 ARG BUILDARCH
 ARG TARGETARCH
