@@ -44,30 +44,28 @@ FROM debian:12-slim AS runner
 WORKDIR /lampac
 EXPOSE 9118
 
-# 1. Устанавливаем только библиотеки (без самого chromium)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates chromium chromium-common curl fontconfig libicu72 libnspr4 libnss3 \
+    ca-certificates curl fontconfig libicu72 libnspr4 libnss3 \
     libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxcomposite1 \
     libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libasound2 \
-    && ln -sf /usr/bin/chromium /usr/bin/chromium-browser \
-    && ln -sf /usr/bin/chromium /lampac/chromium \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Команда, которая заставит Playwright скачать Chromium в папку по умолчанию
+RUN /usr/share/dotnet/dotnet build-server shutdown || true
 
 
-# Явно указываем путь к браузеру внутри папки приложения
 ENV ASPNETCORE_URLS=http://+:9118 \
     DOTNET_RUNNING_IN_CONTAINER=true \
-    CHROMIUM_PATH=/usr/bin/chromium \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
-    PLAYWRIGHT_BROWSERS_PATH=0 \
-    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
-    CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu --headless"
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0 \
+    CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu"
 
 # Копируем результат сборки
 COPY --from=builder /out/lampac /lampac
 # 1. Переходим в папку приложения
+# Переходим в папку и пробуем установить браузер через скрипт (если он есть) или полагаемся на автозапуск
 WORKDIR /lampac
-# 2. Скачиваем и устанавливаем ТОЛЬКО Runtime (среду запуска), а не тяжелый SDK
+RUN touch isdocker
+
 RUN case "$(uname -m)" in \
     aarch64) RID=arm64 ;; \
     x86_64) RID=x64 ;; \
@@ -77,7 +75,6 @@ RUN case "$(uname -m)" in \
     && mkdir -p /usr/share/dotnet \
     && tar -xzf /tmp/dotnet-runtime.tar.gz -C /usr/share/dotnet \
     && rm /tmp/dotnet-runtime.tar.gz
-
 
 # 3. Настраиваем переменные окружения, чтобы система видела dotnet
 ENV DOTNET_ROOT=/usr/share/dotnet \
