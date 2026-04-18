@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl xz-utils libicu76 git \
     && rm -rf /var/lib/apt/lists/*
 
-# Клонируем и сразу УДАЛЯЕМ SISI
+# 1. Клонируем и ФИЗИЧЕСКИ УДАЛЯЕМ папку плагинов SISI
 RUN git clone https://github.com/lampac-nextgen/lampac . \
     && rm -rf Plugins/SISI
 
@@ -38,7 +38,7 @@ FROM debian:13-slim AS runner
 WORKDIR /lampac
 EXPOSE 9118
 
-# Добавляем locales и недостающие библиотеки для Chromium
+# Добавляем locales (чтобы не было ошибок в логах) и библиотеки для Chromium
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates chromium curl fontconfig libicu76 libnspr4 locales \
     libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 \
@@ -49,7 +49,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /out/lampac /lampac
 
-# Важные переменные: порт 9118 и локаль
+# 2. ОТКЛЮЧАЕМ SISI через переменные окружения
 ENV DOTNET_ROOT=/usr/share/dotnet \
     PATH="${PATH}:/usr/share/dotnet" \
     ASPNETCORE_URLS=http://+:9118 \
@@ -57,7 +57,10 @@ ENV DOTNET_ROOT=/usr/share/dotnet \
     LANG=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8 \
     CHROMIUM_PATH=/usr/bin/chromium \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
+    # Эти строки отключают SISI полностью:
+    SISI_enable=false \
+    SISI_all=false
 
 RUN case "$(uname -m)" in \
     aarch64) RID=arm64 ;; \
