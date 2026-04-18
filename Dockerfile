@@ -44,14 +44,13 @@ FROM debian:12-slim AS runner
 WORKDIR /lampac
 EXPOSE 9118
 
-ENV DOTNET_ROOT=/usr/share/dotnet \
-    PATH="${PATH}:/usr/share/dotnet" \
+ENV ASPNETCORE_URLS=http://+:9118 \
     DOTNET_RUNNING_IN_CONTAINER=true \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
-    DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     CHROMIUM_PATH=/usr/bin/chromium \
-    CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage" \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
+    CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage"
+
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -61,6 +60,7 @@ RUN apt-get update \
     fontconfig \
     libicu72 \
     libnspr4 \
+    libnss3 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
