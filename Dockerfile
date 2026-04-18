@@ -32,9 +32,11 @@ RUN case "$TARGETARCH" in \
     arm64) RID=linux-arm64 ;; \
     *) RID=linux-x64 ;; \
     esac \
-    && dotnet publish Core/Core.csproj --configuration Release --runtime "$RID" \
-    --output /out/lampac -p:PlaywrightPlatform="$RID" -p:Parallel=false \
-    && cp -r /root/.cache /out/lampac/cache 
+    && dotnet publish Core/Core.csproj --configuration Release --runtime "$RID" --output /out/lampac \
+    # Установка драйверов Playwright, чтобы появилась папка .cache
+    && dotnet build Core/Core.csproj \
+    && ./bin/Release/net10.0/$RID/playwright.ps1 install --with-deps \ 
+    && cp -r /root/.cache /out/lampac/cache
 
 # --- Runner image ---
 FROM debian:13-slim AS runner
