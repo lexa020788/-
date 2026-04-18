@@ -69,7 +69,12 @@ WORKDIR /lampac
 RUN mkdir -p /lampac/data /lampac/module /lampac/wwwroot
 
 # Создаем конфиг с разрешением внешнего доступа и путем к хрому
-RUN echo '{"listen":{"port":9118},"KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}],"chromium":{"enable":true,"binary":"/usr/bin/chromium"},"WAF":{"allowExternalIpAccess":true}}' > /lampac/init.conf
+RUN echo '{ \
+  "listen": {"port": 9118, "KnownProxies": [{"ip": "0.0.0.0", "prefixLength": 0}]}, \
+  "chromium": {"enable": true, "binary": "/usr/bin/chromium", "args": ["--no-sandbox", "--disable-setuid-sandbox"]}, \
+  "WAF": {"allowExternalIpAccess": true}, \
+  "GC": {"Concurrent": true, "HighMemoryPercent": 95} \
+}' > /lampac/init.conf
 
 # Права и метка докера
 RUN chmod +x /usr/bin/chromium && touch /lampac/isdocker
