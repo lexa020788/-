@@ -51,19 +51,12 @@ ENV DOTNET_ROOT=/usr/share/dotnet \
     DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     CHROMIUM_PATH=/usr/bin/chromium \
     CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage" \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     ca-certificates \
-    chromium \
-    curl \
-    fontconfig \
-    libicu76 \
-    libnspr4 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* \
-    && rm -rf /usr/share/doc /usr/share/man /usr/share/info /usr/share/common-licenses
+...
 
 # Копируем результат сборки
 COPY --from=builder /out/lampac /lampac
