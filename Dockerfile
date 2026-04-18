@@ -44,31 +44,35 @@ FROM debian:12-slim AS runner
 WORKDIR /lampac
 EXPOSE 9118
 
-ENV ASPNETCORE_URLS=http://+:9118 \
-    DOTNET_RUNNING_IN_CONTAINER=true \
-    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
-    CHROMIUM_PATH=/usr/bin/chromium \
+ENV CHROMIUM_PATH=/usr/bin/chromium \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
-    CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage"
+    CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu"
 
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     chromium \
     curl \
     fontconfig \
     libicu72 \
-    libnspr4 \
+    # Добавляем ВСЁ, что требует Chromium для запуска в контейнере:
     libnss3 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libpango-1.0-0 \
+    libasound2 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 # Копируем результат сборки
 COPY --from=builder /out/lampac /lampac
 # 1. Переходим в папку приложения
 WORKDIR /lampac
-
 # 2. Скачиваем и устанавливаем ТОЛЬКО Runtime (среду запуска), а не тяжелый SDK
 RUN case "$(uname -m)" in \
     aarch64) RID=arm64 ;; \
