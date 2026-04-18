@@ -13,7 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl xz-utils libicu76 git \
     && rm -rf /var/lib/apt/lists/*
 
-RUN git clone https://github.com/lampac-nextgen/lampac .
+RUN git clone https://github.com/lampac-nextgen/lampac . \
+    && find . -name "*.csproj" -exec sed -i 's/net10.0/net9.0/g' {} +
 
 RUN case "$BUILDARCH" in \
     arm64) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
@@ -29,8 +30,7 @@ RUN case "$TARGETARCH" in \
     *) RID=linux-x64 ;; \
     esac \
     && /out/usr/share/dotnet/dotnet publish Core/Core.csproj --configuration Release --runtime "$RID" \
-    --output /out/lampac -p:PlaywrightPlatform="$RID" -p:Parallel=false \
-    -p:TargetFramework=net9.0 --self-contained false
+    --output /out/lampac -p:PlaywrightPlatform="$RID" -p:Parallel=false --self-contained false
 
 # --- Runner Stage ---
 FROM debian:13-slim AS runner
