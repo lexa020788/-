@@ -9,7 +9,8 @@ ARG TARGETARCH
 ARG DOTNET_SDK_VERSION
 WORKDIR /build
 
-RUN RUN apt-get update && apt-get install -y --no-install-recommends \
+# Вместо RUN RUN apt-get...
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl xz-utils git libicu76 && rm -rf /var/lib/apt/lists/*
 
 # Клонируем и жестко адаптируем код под .NET 9
