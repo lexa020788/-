@@ -87,4 +87,4 @@ ENV DOTNET_ROOT=/usr/share/dotnet \
 
 # 4. Проверяем наличие файла и запускаем
 RUN touch /lampac/isdocker
-ENTRYPOINT ["dotnet", "Core.dll"]
+ENTRYPOINT ["dotnet", "Core.dll", "--urls", "http://0.0.0"]
