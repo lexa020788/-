@@ -16,7 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN git clone https://github.com/lampac-nextgen/lampac . \
     && find . -name "*.csproj" -exec sed -i 's/<TargetFramework>net10.0<\/TargetFramework>/<TargetFramework>net9.0<\/TargetFramework>/g' {} + \
     && find . -name "*.csproj" -exec sed -i 's/Version="10.0.2"/Version="9.0.0"/g' {} + \
-    && sed -i 's/KnownIPNetworks/KnownNetworks/g' Core/Startup.cs
+    && sed -i 's/options.KnownIPNetworks.Add/\/\/options.KnownIPNetworks.Add/g' Core/Startup.cs \
+    && sed -i 's/options.KnownNetworks.Add/\/\/options.KnownNetworks.Add/g' Core/Startup.cs
     
 RUN case "$BUILDARCH" in \
     arm64) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
@@ -53,7 +54,7 @@ ENV DOTNET_GCHeapHardLimit=300000000 \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates chromium curl fontconfig libicu76 libnspr4 libnss3 libgbm1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
-
+CHROMIUM_PATH=/usr/bin/chromium \\
 # Копируем приложение (БЕЗ --chown=lampac, работаем от ROOT)
 COPY --from=builder /out /
 
