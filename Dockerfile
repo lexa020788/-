@@ -70,6 +70,12 @@ RUN case "$TARGETARCH" in \
 WORKDIR /lampac
 
 RUN echo '{"listen":{"port":9118},"KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}],"chromium":{"enable":true}}' > /lampac/init.conf
+# Запускаем компиляцию один раз прямо во время сборки образа
+# Это создаст все нужные .dll файлы в папке /lampac/data
+RUN dotnet Core.dll --compile-all-modules
+
+# Убеждаемся, что права на скомпилированные файлы остались
+RUN chmod -R 777 /lampac/data
 
 ENTRYPOINT ["dotnet", "Core.dll", "--urls", "http://0.0.0.0:9118"]
 
