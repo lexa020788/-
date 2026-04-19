@@ -15,7 +15,6 @@ RUN curl -fSL -o /tmp/dotnet-sdk.tar.gz https://builds.dotnet.microsoft.com/dotn
 # Собираем как есть, БЕЗ ПРАВОК кода (чтобы не было ошибок CS1525)
 RUN /usr/share/dotnet/dotnet publish Core/Core.csproj --configuration Release --output /out/lampac --self-contained false
 
-
 # --- Runner Stage ---
 FROM debian:13-slim AS runner
 FROM debian:13-slim AS runner
