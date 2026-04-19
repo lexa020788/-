@@ -35,7 +35,7 @@ RUN case "$TARGETARCH" in \
 FROM debian:13-slim AS runner
 ARG TARGETARCH
 WORKDIR /lampac
-EXPOSE 9118
+EXPOSE 8080
 
 # Добавляем переменные как у разработчика (это ВАЖНО для Chromium)
 ENV DOTNET_ROOT=/usr/share/dotnet \
@@ -73,7 +73,7 @@ WORKDIR /lampac
 USER root
 
 RUN echo '{ \
-  "listen":{"port":7860}, \
+  "listen":{"port":8080}, \
   "KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}], \
   "chromium":{ \
     "enable":true, \
@@ -85,7 +85,7 @@ RUN mkdir -p /lampac/data /lampac/cache && chmod -R 777 /lampac
 
 RUN timeout 300s dotnet Core.dll --compile-all-modules || true
 
-EXPOSE 7860
+EXPOSE 8080
 
-ENTRYPOINT ["dotnet", "Core.dll", "--urls", "http://0.0.0.0"]
+ENTRYPOINT ["dotnet", "Core.dll", "--urls", "http://0.0.0.0:8080"]
 
