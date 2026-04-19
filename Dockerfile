@@ -72,7 +72,6 @@ WORKDIR /lampac
 # Переключаемся на root (ОБЯЗАТЕЛЬНО для HF)
 USER root
 
-# Исправляем init.conf: явно указываем путь к Chromium
 RUN echo '{ \
   "listen":{"port":7860}, \
   "KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}], \
@@ -82,16 +81,11 @@ RUN echo '{ \
   } \
 }' > /lampac/init.conf
 
-# Создаем папки и даем права, чтобы компиляция не висла
 RUN mkdir -p /lampac/data /lampac/cache && chmod -R 777 /lampac
 
 RUN timeout 300s dotnet Core.dll --compile-all-modules || true
 
-# Запускаем предварительную компиляцию (она уже в кэше, пройдет быстро)
-RUN dotnet Core.dll --compile-all-modules
-
-# Указываем порт для HF
 EXPOSE 7860
 
-# Финальный запуск
 ENTRYPOINT ["dotnet", "Core.dll", "--urls", "http://0.0.0"]
+
