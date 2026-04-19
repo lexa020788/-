@@ -85,6 +85,8 @@ RUN echo '{ \
 # Создаем папки и даем права, чтобы компиляция не висла
 RUN mkdir -p /lampac/data /lampac/cache && chmod -R 777 /lampac
 
+RUN timeout 300s dotnet Core.dll --compile-all-modules || true
+
 # Запускаем предварительную компиляцию (она уже в кэше, пройдет быстро)
 RUN dotnet Core.dll --compile-all-modules
 
