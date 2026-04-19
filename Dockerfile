@@ -35,7 +35,7 @@ RUN case "$TARGETARCH" in \
 FROM debian:13-slim AS runner
 ARG TARGETARCH
 WORKDIR /lampac
-EXPOSE 8080
+EXPOSE 9118
 
 # Добавляем переменные как у разработчика (это ВАЖНО для Chromium)
 ENV DOTNET_ROOT=/usr/share/dotnet \
@@ -85,7 +85,11 @@ RUN mkdir -p /lampac/data /lampac/cache && chmod -R 777 /lampac
 
 RUN timeout 300s dotnet Core.dll --compile-all-modules || true
 
-EXPOSE 8080
+EXPOSE 9118
 
-ENTRYPOINT ["dotnet", "Core.dll", "--urls", "http://0.0.0.0:8080"]
+# Добавь эту строку перед ENTRYPOINT, если её нет
+ENV ASPNETCORE_URLS=http://+:9118
+
+# И исправь саму последнюю строчку
+ENTRYPOINT ["dotnet", "Core.dll"]
 
