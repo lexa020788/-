@@ -69,8 +69,13 @@ RUN case "$TARGETARCH" in \
 
 WORKDIR /lampac
 
-RUN echo '{"listen":{"port":9118},"KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}],"chromium":{"enable":true}}' > /lampac/init.conf
-# Запускаем компиляцию один раз прямо во время сборки образа
+RUN echo '{ \
+  "listen":{"port":9118}, \
+  "KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}], \
+  "chromium":{"enable":true, "executablePath":"/usr/bin/chromium"}, \
+  "disable_modules": "BongaCams,Chaturbate,Ebalovo,Eporner,HQporner,Porntrex,Runetki,Spankbang,Tizam,Xhamster,Xnxx,Xvideos,AniLiberty,AniLibria,AniMedia,AnimeGo,AnimeLib,AnimeON,Animebesst,Animevost,Dreamerscast,Kodik,Mikai,MoonAnime" \
+}' > /lampac/init.conf
+
 # Это создаст все нужные .dll файлы в папке /lampac/data
 RUN dotnet Core.dll --compile-all-modules
 
