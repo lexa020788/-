@@ -87,5 +87,5 @@ RUN timeout 300s dotnet Core.dll --compile-all-modules || true
 
 EXPOSE 7860
 
-ENTRYPOINT ["dotnet", "Core.dll", "--urls", "http://0.0.0"]
+ENTRYPOINT ["dotnet", "Core.dll", "--urls", "http://0.0.0.0"]
 
