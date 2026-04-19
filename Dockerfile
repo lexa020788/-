@@ -15,10 +15,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN git clone https://github.com/lampac-nextgen/lampac .
 
-RUN rm -rf Modules/Anime Modules/SISI Modules/Market Моdules/Guide
+RUN rm -rf Modules/Anime Modules/SISI Modules/Market Modules/Guide
 
-# 3. И дальше твои старые правки sed (если они еще есть)
-RUN find . -name "*.csproj" -exec sed -i 's/<TargetFramework>net10.0<\/TargetFramework>/<TargetFramework>net9.0<\/TargetFramework>/g' {} +
+# 3. ПОДЧИЩАЕМ КОД (Чтобы не было ошибки как сейчас)
+RUN sed -i '/Anime/d' Core/Startup.cs \
+    && sed -i '/SISI/d' Core/Startup.cs \
+    && sed -i '/KnownIPNetworks/d' Core/Startup.cs \
+    && sed -i '/KnownNetworks/d' Core/Startup.cs \
+    && sed -i '/IPNetwork/d' Core/Startup.cs
 
 RUN case "$BUILDARCH" in \
     arm64) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
