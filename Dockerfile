@@ -69,23 +69,27 @@ RUN case "$TARGETARCH" in \
 
 WORKDIR /lampac
 
-RUN echo '{ \
-  "listen":{"port":9118}, \
-  "KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}], \
-  "chromium":{"enable":true, "executablePath":"/usr/bin/chromium"}, \
-  "disable_modules": "BongaCams,Chaturbate,Ebalovo,Eporner,HQporner,Porntrex,Runetki,Spankbang,Tizam,Xhamster,Xnxx,Xvideos,AniLiberty,AniLibria,AniMedia,AnimeGo,AnimeLib,AnimeON,Animebesst,Animevost,Dreamerscast,Kodik,Mikai,MoonAnime" \
-}' > /lampac/init.conf
-
-# Это создаст все нужные .dll файлы в папке /lampac/data
-RUN dotnet Core.dll --compile-all-modules
-
-# Убеждаемся, что права на скомпилированные файлы остались
-RUN chmod -R 777 /lampac/data
-
-ENTRYPOINT ["dotnet", "Core.dll", "--urls", "http://0.0.0.0:9118"]
-
-# Явно говорим использовать рута
+# Переключаемся на root (ОБЯЗАТЕЛЬНО для HF)
 USER root
 
-# Даем права на запись во все подпапки, где идет компиляция
-RUN chmod -R 777 /lampac
+# Исправляем init.conf: явно указываем путь к Chromium
+RUN echo '{ \
+  "listen":{"port":7860}, \
+  "KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}], \
+  "chromium":{ \
+    "enable":true, \
+    "executablePath":"/usr/bin/chromium" \
+  } \
+}' > /lampac/init.conf
+
+# Создаем папки и даем права, чтобы компиляция не висла
+RUN mkdir -p /lampac/data /lampac/cache && chmod -R 777 /lampac
+
+# Запускаем предварительную компиляцию (она уже в кэше, пройдет быстро)
+RUN dotnet Core.dll --compile-all-modules
+
+# Указываем порт для HF
+EXPOSE 7860
+
+# Финальный запуск
+ENTRYPOINT ["dotnet", "Core.dll", "--urls", "http://0.0.0"]
