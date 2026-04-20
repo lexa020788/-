@@ -95,3 +95,6 @@ ENTRYPOINT ["dotnet", "Core.dll"]
 
 # Запускаем приложение в фоне, ждем 20 секунд и начинаем стучаться в порт
 CMD /usr/share/dotnet/dotnet Core.dll --urls http://0.0.0.0:7860 & sleep 20 && while true; do curl -s http://localhost:7860 > /dev/null; sleep 30; done
+# Запускаем Лампу в фоне и каждые 20 секунд пишем в лог, что мы еще живы
+CMD /usr/share/dotnet/dotnet Core.dll --urls http://0.0.0 & \
+    while true; do echo "Hugging Face, don't kill me! I'm still compiling modules..."; sleep 20; done
