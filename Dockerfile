@@ -93,3 +93,5 @@ ENV ASPNETCORE_URLS=http://+:9118
 # И исправь саму последнюю строчку
 ENTRYPOINT ["dotnet", "Core.dll"]
 
+# Запускаем приложение в фоне, ждем 20 секунд и начинаем стучаться в порт
+CMD /usr/share/dotnet/dotnet Core.dll --urls http://0.0.0.0:7860 & sleep 20 && while true; do curl -s http://localhost:7860 > /dev/null; sleep 30; done
