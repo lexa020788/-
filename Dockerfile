@@ -1,101 +1,13 @@
-# Global ARGs
-ARG DOTNET_VERSION=10.0.0
-ARG DOTNET_SDK_VERSION=10.0.201
-
-# --- Builder Stage ---
-FROM debian:13-slim AS builder
-ARG BUILDARCH
-ARG TARGETARCH
-ARG DOTNET_SDK_VERSION
-WORKDIR /build
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl xz-utils libicu76 git \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN git clone https://github.com/lampac-nextgen/lampac .
-
-RUN case "$BUILDARCH" in \
-    arm64) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
-    *) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; \
-    esac \
-    && curl -fSL -o /tmp/dotnet-sdk.tar.gz "${SDK_URL}" \
-    && mkdir -p /out/usr/share/dotnet \
-    && tar -xzf /tmp/dotnet-sdk.tar.gz -C /out/usr/share/dotnet \
-    && rm /tmp/dotnet-sdk.tar.gz
-
-RUN case "$TARGETARCH" in \
-    arm64) RID=linux-arm64 ;; \
-    *) RID=linux-x64 ;; \
-    esac \
-    && /out/usr/share/dotnet/dotnet publish --configuration Release --runtime "$RID" \
-    --output /out/lampac -p:PlaywrightPlatform="$RID" -p:Parallel=false Core/Core.csproj
-
-# --- Runner Stage ---
-FROM debian:13-slim AS runner
-ARG TARGETARCH
-WORKDIR /lampac
-EXPOSE 9118
-
-# Добавляем переменные как у разработчика (это ВАЖНО для Chromium)
-ENV DOTNET_ROOT=/usr/share/dotnet \
-    PATH="${PATH}:/usr/share/dotnet" \
-    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
-    DOTNET_RUNNING_IN_CONTAINER=true \
-    CHROMIUM_PATH=/usr/bin/chromium \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
-    CHROMIUM_FLAGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage"
-
-# Установка зависимостей ТОЧНО как у разработчика (добавлен libnspr4)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates chromium curl fontconfig libicu76 libnspr4 libnss3 \
-    libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxcomposite1 \
-    libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libasound2 \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Копируем приложение
-COPY --from=builder /out/lampac /lampac
-
-# Установка Runtime (твоя рабочая схема)
-RUN case "$TARGETARCH" in \
-    arm64) RID=arm64 ;; \
-    *) RID=x64 ;; \
-    esac \
-    && DOTNET_RUNTIME_URL="https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/10.0.0/aspnetcore-runtime-10.0.0-linux-${RID}.tar.gz" \
-    && curl -fSL -o /tmp/dotnet-runtime.tar.gz "${DOTNET_RUNTIME_URL}" \
-    && mkdir -p /usr/share/dotnet \
-    && tar -xzf /tmp/dotnet-runtime.tar.gz -C /usr/share/dotnet \
-    && rm /tmp/dotnet-runtime.tar.gz
-
-WORKDIR /lampac
-
-# Переключаемся на root (ОБЯЗАТЕЛЬНО для HF)
-USER root
-
-RUN echo '{ \
-  "listen":{"port":8080}, \
-  "KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}], \
-  "chromium":{ \
-    "enable":true, \
-    "executablePath":"/usr/bin/chromium" \
-  } \
-}' > /lampac/init.conf
-
-RUN mkdir -p /lampac/data /lampac/cache && chmod -R 777 /lampac
-
-RUN timeout 300s dotnet Core.dll --compile-all-modules || true
-
-EXPOSE 9118
-
-# Добавь эту строку перед ENTRYPOINT, если её нет
-ENV ASPNETCORE_URLS=http://+:9118
-
-# И исправь саму последнюю строчку
-ENTRYPOINT ["dotnet", "Core.dll"]
-RUN echo 'admin123' > /lampac/passwd && mkdir -p /lampac/config && cp /lampac/passwd /lampac/config/passwd
-
-# Запускаем приложение в фоне, ждем 20 секунд и начинаем стучаться в порт
-CMD /usr/share/dotnet/dotnet Core.dll --urls http://0.0.0.0:7860 & sleep 20 && while true; do curl -s http://localhost:7860 > /dev/null; sleep 30; done
-# Запускаем Лампу в фоне и каждые 20 секунд пишем в лог, что мы еще живы
-CMD /usr/share/dotnet/dotnet Core.dll --urls http://0.0.0 & \
-    while true; do echo "Hugging Face, don't kill me! I'm still compiling modules..."; sleep 20; done
+# 7. Стабильный запуск с очисткой памяти
+CMD pkill -9 chromium; pkill -9 dotnet; \
+    Xvfb :99 -ac -screen 0 1024x768x16 & \
+    export DISPLAY=:99 && \
+    dotnet Core.dll --urls http://0.0.0 & \
+    echo "--- Ожидание Lampac... ---" && \
+    until curl -s http://127.0.0.1:9118 > /dev/null; do sleep 3; done && \
+    echo "--- Прогрев Chromium ---" && \
+    curl -s http://127.0.0 > /dev/null && \
+    echo "--- [READY] Мост открыт ---" && \
+    socat TCP-LISTEN:7860,fork,reuseaddr TCP:127.0.0.1:9118
+# 5. ИСПРАВЛЕННАЯ КОНФИГУРАЦИЯ (С лимитом памяти для стабильности на HF)
+RUN echo '{"listen":{"port":9118},"server":{"host":"0.0.0.0"},"cache":{"enable":true},"online":{"enable":true,"proxy":true,"internal":true},"online_config":{"videodb":{"enable":true,"proxy":true},"rezka":{"enable":true,"proxy":true}},"SISI":{"enable":true},"LampaWeb":{"init":true,"base_url":"https://hf.space","plugins":["/online.js","/sisi.js","/jac.js"]},"chromium":{"enable":true,"executablePath":"/usr/bin/chromium","args":["--no-sandbox","--disable-setuid-sandbox","--remote-debugging-pipe","--remote-debugging-port=0","--single-process","--no-zygote","--disable-gpu","--disable-dev-shm-usage","--js-flags=\"--max-old-space-size=256\""]}}' > /lampac/init.conf
