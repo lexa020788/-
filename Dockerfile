@@ -18,23 +18,16 @@ ARG TARGETARCH, DOTNET_SDK_VERSION
 WORKDIR /lampac
 EXPOSE 7860
 
-# ЭКСТРЕМАЛЬНЫЕ ЛИМИТЫ ДЛЯ ВЫЖИВАНИЯ В 512МБ
+# Жесткие лимиты памяти для выживания в 512МБ
 ENV PATH="${PATH}:/usr/share/dotnet" \
     DOTNET_RUNNING_IN_CONTAINER=true \
-    # Ограничиваем аппетит .NET (куча ~190МБ)
     DOTNET_GCHeapHardLimit=0xC000000 \
-    ASPNETCORE_URLS=http://0.0.0 \
-    CHROMIUM_PATH=/usr/bin/chromium \
+    ASPNETCORE_URLS=http://0.0.0.0:9118 \
     DOTNET_CLI_HOME=/tmp/dotnet_home
 
+# Убрали Chromium из установки для экономии места и RAM
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates chromium curl fontconfig libicu76 libnspr4 libnss3 \
-    libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxcomposite1 \
-    libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 \
-    libasound2 libglib2.0-0 procps nginx tini \
-    && RID=$( [ "$TARGETARCH" = "arm64" ] && echo "arm64" || echo "x64" ) \
-    && curl -fSL -o sdk.tar.gz "https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-${RID}.tar.gz" \
-    && mkdir -p /usr/share/dotnet && tar -xzf sdk.tar.gz -C /usr/share/dotnet && rm sdk.tar.gz \
+    ca-certificates curl fontconfig libicu76 procps nginx tini \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /out/lampac /lampac
@@ -56,11 +49,10 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; \
             proxy_set_header Connection "upgrade"; \
             proxy_set_header Host $host; \
             proxy_set_header X-Forwarded-Proto $scheme; \
-            proxy_read_timeout 120s; \
         } \
     }' > /etc/nginx/sites-available/default \
-    # ТВОИ АДРЕСА + СУПЕР-ЛИМИТЫ CHROMIUM (64MB JS)
-    && echo '{"listen":{"port":9118},"server":{"host":"0.0.0.0","allow_cors":true},"cache":{"enable":true,"path":"/tmp/cache"},"tmdb":{"enable":true,"proxy":true,"api_key":"4ef0d735117c451680108888591f391d"},"LampaWeb":{"init":true,"base_url":"https://lampohka.koyeb.app/","api_url":"https://lampohka.koyeb.app","online_js":true,"online_priority":["VideoDB","Rezka","Collaps"],"plugins":["/online.js","/sisi.js"]},"chromium":{"enable":true,"semaphore":1,"executablePath":"/usr/bin/chromium","args":["--no-sandbox","--headless=new","--disable-gpu","--disable-dev-shm-usage","--no-zygote","--single-process","--js-flags=\"--max-old-space-size=64 --stack-size=512\""]}}' > /lampac/init.conf \
+    # Chromium ВЫКЛЮЧЕН для стабильности
+    && echo '{"listen":{"port":9118},"server":{"host":"0.0.0.0","allow_cors":true},"cache":{"enable":true,"path":"/tmp/cache"},"tmdb":{"enable":true,"proxy":true,"api_key":"4ef0d735117c451680108888591f391d"},"LampaWeb":{"init":true,"base_url":"https://lampohka.koyeb.app/","api_url":"https://lampohka.koyeb.app","online_js":true,"online_priority":["VideoDB","Rezka","Collaps"],"plugins":["/online.js","/sisi.js"]},"chromium":{"enable":false}}' > /lampac/init.conf \
     && mkdir -p /lampac/system /lampac/system/config \
     && echo '{"TmdbProxy":{"enable":true,"proxy":true},"CubProxy":{"enable":true,"proxy":true},"VideoDB":{"enable":true,"proxy":true,"useproxy":true},"Rezka":{"enable":true,"proxy":true,"useproxy":true},"Collaps":{"enable":true,"proxy":true,"useproxy":true}}' > /lampac/accs.json \
     && cp /lampac/accs.json /lampac/system/accs.json && cp /lampac/accs.json /lampac/system/config/accs.json \
@@ -68,7 +60,7 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; \
 
 RUN echo '#!/bin/bash\n\
 nginx\n\
-sleep 5\n\
+sleep 3\n\
 exec dotnet /lampac/Core.dll --urls http://0.0.0' > /entrypoint.sh && chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
