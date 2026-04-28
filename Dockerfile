@@ -18,10 +18,12 @@ ARG TARGETARCH, DOTNET_SDK_VERSION
 WORKDIR /lampac
 EXPOSE 7860
 
+# ЭКСТРЕМАЛЬНЫЕ ЛИМИТЫ ДЛЯ ВЫЖИВАНИЯ В 512МБ
 ENV PATH="${PATH}:/usr/share/dotnet" \
     DOTNET_RUNNING_IN_CONTAINER=true \
-    DOTNET_GCHeapHardLimit=1C200000 \
-    ASPNETCORE_URLS=http://127.0.0.1:9118 \
+    # Ограничиваем аппетит .NET (куча ~190МБ)
+    DOTNET_GCHeapHardLimit=0xC000000 \
+    ASPNETCORE_URLS=http://0.0.0 \
     CHROMIUM_PATH=/usr/bin/chromium \
     DOTNET_CLI_HOME=/tmp/dotnet_home
 
@@ -57,8 +59,8 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; \
             proxy_read_timeout 120s; \
         } \
     }' > /etc/nginx/sites-available/default \
-    # ИСПРАВЛЕН JSON: добавлены двоеточия и убраны двойные кавычки в URL
-    && echo '{"listen":{"port":9118},"server":{"host":"127.0.0.1","allow_cors":true},"cache":{"enable":true,"path":"/tmp/cache"},"tmdb":{"enable":true,"proxy":true,"api_key":"4ef0d735117c451680108888591f391d"},"LampaWeb":{"init":true,"base_url":"https://lampohka.koyeb.app/","api_url":"https://lampohka.koyeb.app","online_js":true,"online_priority":["VideoDB","Rezka","Collaps"],"plugins":["/online.js","/sisi.js"]},"chromium":{"enable":true,"semaphore":1,"executablePath":"/usr/bin/chromium","args":["--no-sandbox","--headless=new","--disable-gpu","--disable-dev-shm-usage","--no-zygote","--single-process","--js-flags=\"--max-old-space-size=96 --stack-size=512\""]}}' > /lampac/init.conf \
+    # ТВОИ АДРЕСА + СУПЕР-ЛИМИТЫ CHROMIUM (64MB JS)
+    && echo '{"listen":{"port":9118},"server":{"host":"0.0.0.0","allow_cors":true},"cache":{"enable":true,"path":"/tmp/cache"},"tmdb":{"enable":true,"proxy":true,"api_key":"4ef0d735117c451680108888591f391d"},"LampaWeb":{"init":true,"base_url":"https://lampohka.koyeb.app/","api_url":"https://lampohka.koyeb.app","online_js":true,"online_priority":["VideoDB","Rezka","Collaps"],"plugins":["/online.js","/sisi.js"]},"chromium":{"enable":true,"semaphore":1,"executablePath":"/usr/bin/chromium","args":["--no-sandbox","--headless=new","--disable-gpu","--disable-dev-shm-usage","--no-zygote","--single-process","--js-flags=\"--max-old-space-size=64 --stack-size=512\""]}}' > /lampac/init.conf \
     && mkdir -p /lampac/system /lampac/system/config \
     && echo '{"TmdbProxy":{"enable":true,"proxy":true},"CubProxy":{"enable":true,"proxy":true},"VideoDB":{"enable":true,"proxy":true,"useproxy":true},"Rezka":{"enable":true,"proxy":true,"useproxy":true},"Collaps":{"enable":true,"proxy":true,"useproxy":true}}' > /lampac/accs.json \
     && cp /lampac/accs.json /lampac/system/accs.json && cp /lampac/accs.json /lampac/system/config/accs.json \
@@ -66,8 +68,8 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; \
 
 RUN echo '#!/bin/bash\n\
 nginx\n\
-sleep 2\n\
-exec dotnet /lampac/Core.dll --urls http://127.0.0.1:9118' > /entrypoint.sh && chmod +x /entrypoint.sh
+sleep 5\n\
+exec dotnet /lampac/Core.dll --urls http://0.0.0' > /entrypoint.sh && chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/bin/bash", "/entrypoint.sh"]
