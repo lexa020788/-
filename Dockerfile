@@ -1,66 +1,33 @@
-# Global ARGs
-ARG DOTNET_SDK_VERSION=10.0.201
+FROM debian:12.5-slim
 
-# --- СТАДИЯ СБОРКИ ---
-FROM --platform=$BUILDPLATFORM debian:13-slim AS builder
-ARG BUILDARCH, TARGETARCH, DOTNET_SDK_VERSION
-WORKDIR /build
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl xz-utils libicu76 git \
-    && git clone --depth 1 https://github.com/lampac-nextgen/lampac . \
-    && SDK_URL=$( [ "$BUILDARCH" = "arm64" ] && echo "https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" || echo "https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ) \
-    && curl -fSL -o sdk.tar.gz "${SDK_URL}" && mkdir -p /usr/share/dotnet && tar -xzf sdk.tar.gz -C /usr/share/dotnet && rm sdk.tar.gz \
-    && RID=$( [ "$TARGETARCH" = "arm64" ] && echo "linux-arm64" || echo "linux-x64" ) \
-    && /usr/share/dotnet/dotnet publish --configuration Release --runtime "$RID" --output /out/lampac -p:Parallel=false Core/Core.csproj
+EXPOSE 8000
+WORKDIR /home
 
-# --- СТАДИЯ ЗАПУСКА ---
-FROM debian:13-slim AS runner
-ARG TARGETARCH, DOTNET_SDK_VERSION
-WORKDIR /lampac
-EXPOSE 7860
-
-# Жесткие лимиты памяти для выживания в 512МБ
-ENV PATH="${PATH}:/usr/share/dotnet" \
-    DOTNET_RUNNING_IN_CONTAINER=true \
-    DOTNET_GCHeapHardLimit=0xC000000 \
-    ASPNETCORE_URLS=http://0.0.0.0:9118 \
-    DOTNET_CLI_HOME=/tmp/dotnet_home
-
-# Убрали Chromium из установки для экономии места и RAM
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl fontconfig libicu76 procps nginx tini \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl unzip libicu-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /out/lampac /lampac
-COPY --from=builder /build/Shared /lampac/shared
-COPY --from=builder /build/Online /lampac/online
-COPY --from=builder /build/SISI /lampac/sisi
-COPY --from=builder /build/Modules /lampac/modules
-COPY --from=builder /build/Core/wwwroot /lampac/wwwroot
+RUN curl -fSL -k -o dotnet.tar.gz https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/9.0.12/aspnetcore-runtime-9.0.12-linux-x64.tar.gz \
+    && mkdir -p /usr/share/dotnet \
+    && tar -oxzf dotnet.tar.gz -C /usr/share/dotnet \
+    && rm dotnet.tar.gz
 
-RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; \
-    && find /lampac/online -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; \
-    && echo 'server { \
-        listen 7860; \
-        server_tokens off; \
-        location / { \
-            proxy_pass http://127.0.0.1:9118; \
-            proxy_http_version 1.1; \
-            proxy_set_header Upgrade $http_upgrade; \
-            proxy_set_header Connection "upgrade"; \
-            proxy_set_header Host $host; \
-            proxy_set_header X-Forwarded-Proto $scheme; \
-        } \
-    }' > /etc/nginx/sites-available/default \
-    # Chromium ВЫКЛЮЧЕН для стабильности
-    && echo '{"listen":{"port":9118},"server":{"host":"0.0.0.0","allow_cors":true},"cache":{"enable":true,"path":"/tmp/cache"},"tmdb":{"enable":true,"proxy":true,"api_key":"4ef0d735117c451680108888591f391d"},"LampaWeb":{"init":true,"base_url":"https://lampohka.koyeb.app/","api_url":"https://lampohka.koyeb.app","online_js":true,"online_priority":["VideoDB","Rezka","Collaps"],"plugins":["/online.js","/sisi.js"]},"chromium":{"enable":false}}' > /lampac/init.conf \
-    && mkdir -p /lampac/system /lampac/system/config \
-    && echo '{"TmdbProxy":{"enable":true,"proxy":true},"CubProxy":{"enable":true,"proxy":true},"VideoDB":{"enable":true,"proxy":true,"useproxy":true},"Rezka":{"enable":true,"proxy":true,"useproxy":true},"Collaps":{"enable":true,"proxy":true,"useproxy":true}}' > /lampac/accs.json \
-    && cp /lampac/accs.json /lampac/system/accs.json && cp /lampac/accs.json /lampac/system/config/accs.json \
-    && mkdir -p /lampac/data /lampac/cache /run/nginx && chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
+RUN curl -L -k -o publish.zip https://github.com/lampac-talks/lampac/releases/latest/download/publish.zip \
+    && unzip -o publish.zip && rm -f publish.zip && rm -rf merchant \
+    && rm -rf runtimes/os* && rm -rf runtimes/win* && rm -rf runtimes/linux-arm runtimes/linux-arm64 runtimes/linux-musl-arm64 runtimes/linux-musl-x64 \
+    && touch isdocker
 
-RUN echo '#!/bin/bash\n\
-nginx\n\
-sleep 3\n\
+RUN curl -k -s https://raw.githubusercontent.com/lampac-talks/lampac/main/Build/Docker/update.sh | bash
+
+RUN echo '{"listen":{"port":8000,"scheme":"https","frontend":"cloudflare"},"KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}],"mikrotik":true,"typecache":"mem","GC":{"enable":true,"Concurrent":false,"ConserveMemory":9,"HighMemoryPercent":1,"RetainVM":false},"WAF":{"enable":false,"bypassLocalIP":true,"allowExternalIpAccess":true,"bruteForceProtection":false},"watcherInit":"cron","pirate_store":false,"rch":{"keepalive":900},"weblog":{"enable":true},"chromium":{"enable":false},"firefox":{"enable":false},"LampaWeb":{"autoupdate":false,"initPlugins":{"timecode":false,"backup":false,"sync":false}},"cub":{"enable":true,"geo":["RU"]},"tmdb":{"enable":true},"serverproxy":{"verifyip":false,"buffering":{"enable":false},"image":{"cache":false,"cache_rsize":false}},"online":{"checkOnlineSearch":false},"sisi":{"push_all":false,"rsize_disable":["BongaCams","Chaturbate","Runetki","PornHub","Eporner","HQporner","Spankbang","Porntrex","Xnxx","Xvideos","Xhamster","Tizam"],"proxyimg_disable":["Ebalovo"]},"Mirage":{"displayindex":1},"Ashdi":{"rhub":true},"Kinoukr":{"rhub":true},"VDBmovies":{"rhub":true},"VideoDB":{"rhub":true},"FanCDN":{"rhub":true},"Rezka":{"rhub":true,"scheme":"https"},"Kinotochka":{"rhub":true,"rhub_streamproxy":true,"streamproxy":false,"geostreamproxy":null,"rhub_geo_disable":["RU"]},"Videoseed":{"streamproxy":false,"geostreamproxy":null},"Vibix":{"streamproxy":false,"geostreamproxy":null},"iRemux":{"streamproxy":false,"geostreamproxy":null},"Rgshows":{"streamproxy":false,"geostreamproxy":null},"Autoembed":{"enable":false},"Animevost":{"rhub":true},"AnilibriaOnline":{"rhub":true},"Ebalovo":{"rhub":true},"Spankbang":{"rhub":true,"rhub_geo_disable":["RU"]},"BongaCams":{"rhub":true},"Chaturbate":{"rhub":true,"rhub_geo_disable":["RU"]},"Runetki":{"rhub":true},"HQporner":{"rhub":true,"streamproxy":false,"geostreamproxy":null,"qualitys_proxy":false,"geo_hide":["RU"]},"Eporner":{"streamproxy":false,"geostreamproxy":null,"qualitys_proxy":false,"rhub_geo_disable":["RU"]},"Porntrex":{"rhub":true,"streamproxy":false,"geostreamproxy":null,"qualitys_proxy":false,"rhub_geo_disable":["RU"]},"Xhamster":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true,"rhub_geo_disable":["RU"]},"Xnxx":{"rhub":true,"rhub_fallback":true,"rhub_streamproxy":true,"rhub_geo_disable":["RU"]},"Tizam":{"rhub":true,"rhub_fallback":true,"streamproxy":false,"geostreamproxy":null,"qualitys_proxy":false},"Xvideos":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true,"rhub_geo_disable":["RU"]},"PornHub":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"RutubeMovie":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true,"rhub_geo_disable":["UA"]},"VkMovie":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"Plvideo":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true,"rhub_geo_disable":["UA"]},"CDNvideohub":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"Redheadsound":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"CDNmovies":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"AniMedia":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"Animebesst":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true}}' > /home/init.conf
+
+RUN echo '"typesearch":"webapi","merge":null' > /home/module/JacRed.conf
+
+RUN echo '[{"enable":true,"dll":"SISI.dll"},{"enable":true,"dll":"Online.dll"},{"enable":true,"initspace":"Catalog.ModInit","dll":"Catalog.dll"},{"enable":true,"initspace":"TorrServer.ModInit","dll":"TorrServer.dll"},{"enable":true,"initspace":"Jackett.ModInit","dll":"JacRed.dll"}]' > /home/module/manifest.json
+
+RUN mkdir -p torrserver && curl -L -k -o torrserver/TorrServer-linux https://github.com/YouROK/TorrServer/releases/latest/download/TorrServer-linux-amd64 \
+    && chmod +x torrserver/TorrServer-linux
+
+ENTRYPOINT ["/usr/share/dotnet/dotnet", "Lampac.dll"]sleep 3\n\
 exec dotnet /lampac/Core.dll --urls http://0.0.0' > /entrypoint.sh && chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
