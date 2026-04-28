@@ -15,11 +15,9 @@ RUN curl -fSL -o dotnet.tar.gz https://builds.dotnet.microsoft.com/dotnet/aspnet
     && rm dotnet.tar.gz
 
 # 3. Скачивание Lampac (используем стабильную ссылку на ветку main)
-RUN curl -L -H "User-Agent: Mozilla/5.0" -o publish.zip https://github.com \
-    && unzip -o publish.zip \
-    && mv lampac-main/* ./ \
-    && rm -rf lampac-main publish.zip merchant \
-    && rm -rf runtimes/os* runtimes/win* runtimes/linux-arm* runtimes/linux-musl* \
+RUN curl -L -k -o publish.zip https://github.com/lampac-talks/lampac/releases/latest/download/publish.zip \
+    && unzip -o publish.zip && rm -f publish.zip && rm -rf merchant \
+    && rm -rf runtimes/os* && rm -rf runtimes/win* && rm -rf runtimes/linux-arm runtimes/linux-arm64 runtimes/linux-musl-arm64 runtimes/linux-musl-x64 \
     && touch isdocker
 
 # 4. Обновление через скрипт автора
