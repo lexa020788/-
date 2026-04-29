@@ -82,7 +82,7 @@ RUN echo '{ \
 }, \
 "chromium": { \
   "enable": true, \
-  "browserWSEndpoint": "wss://lexa020788-chrome.hf.space:443/chromium", \
+  "browserWSEndpoint": "https://lexa020788-chrome.hf.space/chromium", \
   "ignoreHTTPSErrors": true, \
   "args": ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"] \
 } \
