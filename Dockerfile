@@ -36,7 +36,6 @@ FROM debian:13-slim AS runner
 ARG TARGETARCH
 ARG DOTNET_SDK_VERSION
 WORKDIR /lampac
-# Koyeb ожидает трафик на порту 8000
 EXPOSE 8000
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -62,10 +61,9 @@ COPY --from=builder /build/Core/wwwroot /lampac/wwwroot
 RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
     find /lampac/online -name "*.js" -exec cp -f {} /lampac/wwwroot/ \;
 
-# Настройка Nginx на порт 8000 для Koyeb
 RUN echo 'server { listen 8000; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# Конфиг: lowMemoryMode=true, Chromium внешний, Surs удален
+# Исправлено: endpoint и параметры хрома
 RUN echo '{ \
 "listen": {"port": 9118}, \
 "server": {"host": "0.0.0.0", "allow_cors": true}, \
@@ -84,13 +82,12 @@ RUN echo '{ \
 }, \
 "chromium": { \
   "enable": true, \
-  "browserWSEndpoint": "wss://lexa020788-chrome.hf.space/chromium", \
+  "browserWSEndpoint": "wss://lexa020788-chrome.hf.space:443/chromium", \
   "ignoreHTTPSErrors": true, \
-  "args": ["--no-sandbox"] \
+  "args": ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"] \
 } \
 }' > /lampac/init.conf
 
-# Настройки модулей: VideoDB и Rezka через внешний хром
 RUN mkdir -p /lampac/system /lampac/system/config && \
 echo '{ \
 "VideoDB": {"enable": true, "proxy": true, "useproxy": true, "use_chromium": true}, \
@@ -106,5 +103,5 @@ RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && \
     chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-# Исправлено: crome -> chrome в команде пинга
-CMD curl -s https://lexa020788-chrome.hf.space > /dev/null & dotnet Core.dll --urls http://127.0.0.1:9118 & nginx -g "daemon off;"
+# Будильник: сначала пингуем хром, ждем 5 секунд и запускаем основное
+CMD curl -s https://lexa020788-chrome.hf.space > /dev/null && sleep 5 && dotnet Core.dll --urls http://127.0.0.1:9118 & nginx -g "daemon off;"
