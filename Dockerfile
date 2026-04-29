@@ -36,7 +36,7 @@ FROM debian:13-slim AS runner
 ARG TARGETARCH
 ARG DOTNET_SDK_VERSION
 WORKDIR /lampac
-# Порт 8000 для Koyeb
+# Koyeb порт 8000
 EXPOSE 8000
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -62,49 +62,46 @@ COPY --from=builder /build/Core/wwwroot /lampac/wwwroot
 RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
     find /lampac/online -name "*.js" -exec cp -f {} /lampac/wwwroot/ \;
 
-# Nginx прокси для Koyeb
+# Nginx прокси для Koyeb (8000 -> 9118)
 RUN echo 'server { listen 8000; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# Конфиг: Внешний хром с токеном и без сурса
-RUN echo '{ \
+# Конфиг: Мобильный User-Agent и связь с HF
+RUN mkdir -p /lampac/system /lampac/system/config && \
+echo '{ \
 "listen": {"port": 9118}, \
 "server": {"host": "0.0.0.0", "allow_cors": true}, \
 "cache": {"enable": true, "path": "/tmp/cache"}, \
 "lowMemoryMode": true, \
-"tmdb": { \
-  "enable": true, \
-  "proxy": false, \
-  "api_key": "4ef0d735117c451680108888591f391d" \
-}, \
+"tmdb": { "enable": true, "proxy": true, "api_key": "4ef0d735117c451680108888591f391d" }, \
 "LampaWeb": { \
   "init": true, \
-  "online_js": true, \
-  "online_priority": ["VideoDB", "Rezka", "Collaps", "Kinobase"], \
-  "plugins": ["/online.js", "/sisi.js"] \
+  "base_url": "https://hf.space", \
+  "api_url": "https://hf.space" \
 }, \
 "chromium": { \
   "enable": true, \
-  "browserWSEndpoint": "wss://lexa020788-chrome.hf.space/chromium?token=mysecret123", \
+  "browserWSEndpoint": "wss://lexa020788-chrome.hf.space/", \
   "ignoreHTTPSErrors": true, \
-  "args": ["--no-sandbox"] \
+  "args": [ \
+    "--user-agent=\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1\"", \
+    "--viewport-width=390", \
+    "--viewport-height=844" \
+  ] \
 } \
-}' > /lampac/init.conf
+}' > /lampac/system/init.conf
 
-# Настройки VideoDB и Rezka на использование хрома
-RUN mkdir -p /lampac/system /lampac/system/config && \
-echo '{ \
-"VideoDB": {"enable": true, "proxy": true, "useproxy": true, "use_chromium": true}, \
-"Rezka": {"enable": true, "proxy": true, "useproxy": true, "use_chromium": true}, \
-"Collaps": {"enable": true, "proxy": true, "useproxy": true}, \
-"HDVB": {"enable": true, "proxy": true, "useproxy": true}, \
-"Kinobase": {"enable": true, "proxy": true, "useproxy": true} \
-}' > /lampac/accs.json && \
-cp /lampac/accs.json /lampac/system/accs.json && \
-cp /lampac/accs.json /lampac/system/config/accs.json
+# Настройки модулей (VideoDB с форсированным мобильным хромом)
+RUN echo '{ \
+"VideoDB": {"enable": true, "proxy": true, "use_chromium": true, "uapi": true}, \
+"Rezka": {"enable": true, "proxy": true, "use_chromium": true}, \
+"Kinobase": {"enable": true, "proxy": true}, \
+"Kinogo": {"enable": true, "proxy": true} \
+}' > /lampac/system/accs.json && \
+cp /lampac/system/accs.json /lampac/system/config/accs.json
 
 RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && \
     chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-# Пробуждение хрома и запуск
-CMD curl -s https://lexa020788-chrome.hf.space > /dev/null && dotnet Core.dll --urls http://127.0.0.1:9118 & nginx -g "daemon off;"
+# Пробуждаем хром на HF перед стартом
+CMD curl -s -L https://hf.space > /dev/null && dotnet Core.dll --urls http://127.0.0.1:9118 & nginx -g "daemon off;"
