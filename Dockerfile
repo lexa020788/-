@@ -107,4 +107,4 @@ RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && \
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 # Добавлен пинг хрома для пробуждения при старте
-CMD curl -s https://hf.space > /dev/null & dotnet Core.dll --urls http://127.0.0.1:9118 & nginx -g "daemon off;"
+CMD curl -s https://lexa020788-chrome.hf.space > /dev/null & dotnet Core.dll --urls http://127.0.0.1:9118 & nginx -g "daemon off;"
