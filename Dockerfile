@@ -1,43 +1,109 @@
-FROM debian:12.5-slim
+# Global ARGs
+ARG DOTNET_VERSION=10.0.5
+ARG DOTNET_SDK_VERSION=10.0.201
 
-EXPOSE 8000
-WORKDIR /home
+# --- Builder Stage ---
+FROM --platform=$BUILDPLATFORM debian:13-slim AS builder
+ARG BUILDARCH
+ARG TARGETARCH
+ARG DOTNET_SDK_VERSION
+WORKDIR /build
 
-# 1. Установка системных зависимостей
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl unzip libicu-dev \
+    ca-certificates curl xz-utils libicu76 git \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git clone https://github.com/lampac-nextgen/lampac .
+
+RUN case "$BUILDARCH" in \
+    arm64) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
+    *) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; \
+    esac \
+    && curl -fSL -o /tmp/dotnet-sdk.tar.gz "${SDK_URL}" \
+    && mkdir -p /usr/share/dotnet \
+    && tar -xzf /tmp/dotnet-sdk.tar.gz -C /usr/share/dotnet \
+    && rm /tmp/dotnet-sdk.tar.gz
+
+RUN case "$TARGETARCH" in \
+    arm64) RID=linux-arm64 ;; \
+    *) RID=linux-x64 ;; \
+    esac \
+    && /usr/share/dotnet/dotnet publish --configuration Release --runtime "$RID" \
+    --output /out/lampac -p:Parallel=false Core/Core.csproj
+
+# --- Runner Stage ---
+FROM debian:13-slim AS runner
+ARG TARGETARCH
+ARG DOTNET_SDK_VERSION
+WORKDIR /lampac
+# Koyeb использует порт 8000 по умолчанию
+EXPOSE 8000
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl fontconfig libicu76 procps nginx tini \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 2. Установка .NET Runtime 9.0
-RUN curl -fSL -o dotnet.tar.gz https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/9.0.12/aspnetcore-runtime-9.0.12-linux-x64.tar.gz \
-    && mkdir -p /usr/share/dotnet \
-    && tar -oxzf dotnet.tar.gz -C /usr/share/dotnet \
-    && rm dotnet.tar.gz
+RUN case "$TARGETARCH" in arm64) RID=arm64 ;; *) RID=x64 ;; esac && \
+    curl -fSL -o /tmp/sdk.tar.gz "https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-${RID}.tar.gz" && \
+    mkdir -p /usr/share/dotnet && tar -xzf /tmp/sdk.tar.gz -C /usr/share/dotnet && rm /tmp/sdk.tar.gz
 
-# 3. Скачивание Lampac (используем стабильную ссылку на ветку main)
-RUN curl -L -k -o publish.zip https://github.com/lampac-talks/lampac/releases/latest/download/publish.zip \
-    && unzip -o publish.zip && rm -f publish.zip && rm -rf merchant \
-    && rm -rf runtimes/os* && rm -rf runtimes/win* && rm -rf runtimes/linux-arm runtimes/linux-arm64 runtimes/linux-musl-arm64 runtimes/linux-musl-x64 \
-    && touch isdocker
+ENV PATH="${PATH}:/usr/share/dotnet" \
+    DOTNET_RUNNING_IN_CONTAINER=true \
+    ASPNETCORE_URLS=http://127.0.0.1:9118 \
+    DOTNET_CLI_HOME=/tmp/dotnet_home
 
-# 4. Обновление через скрипт автора
-RUN curl -s https://raw.githubusercontent.com/lampac-talks/lampac/main/Build/Docker/update.sh | bash || true
+COPY --from=builder /out/lampac /lampac
+COPY --from=builder /build/Shared /lampac/shared
+COPY --from=builder /build/Online /lampac/online
+COPY --from=builder /build/SISI /lampac/sisi
+COPY --from=builder /build/Modules /lampac/modules
+COPY --from=builder /build/Core/wwwroot /lampac/wwwroot
 
-# 5. Создание конфигов (добавлен mkdir для module)
-RUN echo '{"listen":{"port":8000,"scheme":"https","frontend":"cloudflare"},"KnownProxies":[{"ip":"0.0.0.0","prefixLength":0}],"mikrotik":true,"typecache":"mem","GC":{"enable":true,"Concurrent":false,"ConserveMemory":9,"HighMemoryPercent":1,"RetainVM":false},"WAF":{"enable":false,"bypassLocalIP":true,"allowExternalIpAccess":true,"bruteForceProtection":false},"watcherInit":"cron","pirate_store":false,"rch":{"keepalive":900},"weblog":{"enable":true},"chromium":{"enable":false},"firefox":{"enable":false},"LampaWeb":{"autoupdate":false,"initPlugins":{"timecode":false,"backup":false,"sync":false}},"cub":{"enable":true,"geo":["RU"]},"tmdb":{"enable":true},"serverproxy":{"verifyip":false,"buffering":{"enable":false},"image":{"cache":false,"cache_rsize":false}},"online":{"checkOnlineSearch":false},"sisi":{"push_all":false,"rsize_disable":["BongaCams","Chaturbate","Runetki","PornHub","Eporner","HQporner","Spankbang","Porntrex","Xnxx","Xvideos","Xhamster","Tizam"],"proxyimg_disable":["Ebalovo"]},"Mirage":{"displayindex":1},"Ashdi":{"rhub":true},"Kinoukr":{"rhub":true},"VDBmovies":{"rhub":true},"VideoDB":{"rhub":true},"FanCDN":{"rhub":true},"Rezka":{"rhub":true,"scheme":"https"},"Kinotochka":{"rhub":true,"rhub_streamproxy":true,"streamproxy":false,"geostreamproxy":null,"rhub_geo_disable":["RU"]},"Videoseed":{"streamproxy":false,"geostreamproxy":null},"Vibix":{"streamproxy":false,"geostreamproxy":null},"iRemux":{"streamproxy":false,"geostreamproxy":null},"Rgshows":{"streamproxy":false,"geostreamproxy":null},"Autoembed":{"enable":false},"Animevost":{"rhub":true},"AnilibriaOnline":{"rhub":true},"Ebalovo":{"rhub":true},"Spankbang":{"rhub":true,"rhub_geo_disable":["RU"]},"BongaCams":{"rhub":true},"Chaturbate":{"rhub":true,"rhub_geo_disable":["RU"]},"Runetki":{"rhub":true},"HQporner":{"rhub":true,"streamproxy":false,"geostreamproxy":null,"qualitys_proxy":false,"geo_hide":["RU"]},"Eporner":{"streamproxy":false,"geostreamproxy":null,"qualitys_proxy":false,"rhub_geo_disable":["RU"]},"Porntrex":{"rhub":true,"streamproxy":false,"geostreamproxy":null,"qualitys_proxy":false,"rhub_geo_disable":["RU"]},"Xhamster":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true,"rhub_geo_disable":["RU"]},"Xnxx":{"rhub":true,"rhub_fallback":true,"rhub_streamproxy":true,"rhub_geo_disable":["RU"]},"Tizam":{"rhub":true,"rhub_fallback":true,"streamproxy":false,"geostreamproxy":null,"qualitys_proxy":false},"Xvideos":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true,"rhub_geo_disable":["RU"]},"PornHub":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"RutubeMovie":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true,"rhub_geo_disable":["UA"]},"VkMovie":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"Plvideo":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true,"rhub_geo_disable":["UA"]},"CDNvideohub":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"Redheadsound":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"CDNmovies":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"AniMedia":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true},"Animebesst":{"rhub":true,"rhub_streamproxy":true,"rhub_fallback":true}}' > /home/init.conf \
-    && mkdir -p /home/module \
-    && echo '"typesearch":"webapi","merge":null' > /home/module/JacRed.conf \
-    && echo '[{"enable":true,"dll":"SISI.dll"},{"enable":true,"dll":"Online.dll"},{"enable":true,"initspace":"Catalog.ModInit","dll":"Catalog.dll"},{"enable":true,"initspace":"TorrServer.ModInit","dll":"TorrServer.dll"},{"enable":true,"initspace":"Jackett.ModInit","dll":"JacRed.dll"}]' > /home/module/manifest.json
+RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
+    find /lampac/online -name "*.js" -exec cp -f {} /lampac/wwwroot/ \;
 
-# 6. Установка TorrServer
-RUN mkdir -p torrserver && \
-    curl -L -H "User-Agent: Mozilla/5.0" -o torrserver/TorrServer-linux https://github.com/YouROK/TorrServer/releases/latest/download/TorrServer-linux-amd64 && \
-    chmod +x torrserver/TorrServer-linux
+# Nginx настроен на порт 8000 для Koyeb
+RUN echo 'server { listen 8000; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# 7. Скрипт запуска для обоих сервисов
-RUN echo '#!/bin/bash\n\
-./torrserver/TorrServer-linux & \n\
-sleep 2\n\
-exec /usr/share/dotnet/dotnet Lampac.dll --urls http://0.0.0' > /entrypoint.sh && chmod +x /entrypoint.sh
+# Исправлено: lowMemoryMode включен, TMDB proxy выключен, Chromium настроен на внешний адрес
+RUN echo '{ \
+"listen": {"port": 9118}, \
+"server": {"host": "0.0.0.0", "allow_cors": true}, \
+"cache": {"enable": true, "path": "/tmp/cache"}, \
+"lowMemoryMode": true, \
+"tmdb": { \
+"enable": true, \
+"proxy": false, \
+"api_key": "4ef0d735117c451680108888591f391d" \
+}, \
+"LampaWeb": { \
+"init": true, \
+"online_js": true, \
+"online_priority": ["VideoDB", "Surs", "Rezka", "Collaps"], \
+"plugins": ["/online.js", "/sisi.js", "https://surs.me"] \
+}, \
+"chromium": { \
+"enable": true, \
+"browserWSEndpoint": "wss://ССЫЛКА_НА_ТВОЙ_ХРОМ_СПЕЙС.hf.space", \
+"args": ["--no-sandbox"] \
+} \
+}' > /lampac/init.conf
 
-ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
+# Настройки модулей (TMDB прокси удален)
+RUN mkdir -p /lampac/system /lampac/system/config && \
+echo '{ \
+"Surs": {"enable": true, "proxy": true, "useproxy": true}, \
+"VideoDB": {"enable": true, "proxy": true, "useproxy": true, "use_chromium": true}, \
+"Rezka": {"enable": true, "proxy": true, "useproxy": true, "use_chromium": true}, \
+"Collaps": {"enable": true, "proxy": true, "useproxy": true}, \
+"HDVB": {"enable": true, "proxy": true, "useproxy": true}, \
+"Kinobase": {"enable": true, "proxy": true, "useproxy": true} \
+}' > /lampac/accs.json && \
+cp /lampac/accs.json /lampac/system/accs.json && \
+cp /lampac/accs.json /lampac/system/config/accs.json
+
+RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && \
+    chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD dotnet Core.dll --urls http://127.0.0.1:9118 & nginx -g "daemon off;"
