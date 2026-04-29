@@ -38,6 +38,7 @@ ARG DOTNET_SDK_VERSION
 WORKDIR /lampac
 EXPOSE 8000
 
+# Установка системных библиотек (Chromium удален для экономии 300МБ)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl fontconfig libicu76 procps nginx tini \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -63,7 +64,7 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
 
 RUN echo 'server { listen 8000; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# Конфиг: Хром ВЫКЛЮЧЕН, включена маскировка под Android
+# Исправленный init.conf: Хром выключен, маскировка под Android включена
 RUN echo '{ \
 "listen": {"port": 9118}, \
 "server": {"host": "0.0.0.0", "allow_cors": true}, \
@@ -88,11 +89,11 @@ RUN echo '{ \
 } \
 }' > /lampac/init.conf
 
-# Модули: use_chromium выключен для всех
+# Настройки модулей: Перенаправляем VideoDB и Rezka на внешние парсеры
 RUN mkdir -p /lampac/system /lampac/system/config && \
 echo '{ \
-"VideoDB": {"enable": true, "proxy": true, "useproxy": true, "use_chromium": false}, \
-"Rezka": {"enable": true, "proxy": true, "useproxy": true, "use_chromium": false}, \
+"VideoDB": {"enable": true, "proxy": true, "useproxy": true, "host": "http://moy.su", "use_chromium": false}, \
+"Rezka": {"enable": true, "proxy": true, "useproxy": true, "host": "http://moy.su", "use_chromium": false}, \
 "Collaps": {"enable": true, "proxy": true, "useproxy": true}, \
 "HDVB": {"enable": true, "proxy": true, "useproxy": true}, \
 "Kinobase": {"enable": true, "proxy": true, "useproxy": true} \
@@ -104,5 +105,4 @@ RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && \
     chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-# Запуск только Lampac и Nginx
 CMD dotnet Core.dll --urls http://127.0.0.1:9118 & nginx -g "daemon off;"
