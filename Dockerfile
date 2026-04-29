@@ -36,9 +36,9 @@ FROM debian:13-slim AS runner
 ARG TARGETARCH
 ARG DOTNET_SDK_VERSION
 WORKDIR /lampac
+# Порт 8000 для Koyeb
 EXPOSE 8000
 
-# Установка системных библиотек (Chromium удален для экономии 300МБ)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl fontconfig libicu76 procps nginx tini \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -62,9 +62,10 @@ COPY --from=builder /build/Core/wwwroot /lampac/wwwroot
 RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
     find /lampac/online -name "*.js" -exec cp -f {} /lampac/wwwroot/ \;
 
+# Nginx прокси для Koyeb
 RUN echo 'server { listen 8000; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# Исправленный init.conf: Хром выключен, маскировка под Android включена
+# Конфиг: Внешний хром с токеном и без сурса
 RUN echo '{ \
 "listen": {"port": 9118}, \
 "server": {"host": "0.0.0.0", "allow_cors": true}, \
@@ -81,19 +82,19 @@ RUN echo '{ \
   "online_priority": ["VideoDB", "Rezka", "Collaps", "Kinobase"], \
   "plugins": ["/online.js", "/sisi.js"] \
 }, \
-"parser": { \
-  "useragent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36" \
-}, \
 "chromium": { \
-  "enable": false \
+  "enable": true, \
+  "browserWSEndpoint": "wss://lexa020788-chrome.hf.space/chromium?token=mysecret123", \
+  "ignoreHTTPSErrors": true, \
+  "args": ["--no-sandbox"] \
 } \
 }' > /lampac/init.conf
 
-# Настройки модулей: Перенаправляем VideoDB и Rezka на внешние парсеры
+# Настройки VideoDB и Rezka на использование хрома
 RUN mkdir -p /lampac/system /lampac/system/config && \
 echo '{ \
-"VideoDB": {"enable": true, "proxy": true, "useproxy": true, "host": "http://moy.su", "use_chromium": false}, \
-"Rezka": {"enable": true, "proxy": true, "useproxy": true, "host": "http://moy.su", "use_chromium": false}, \
+"VideoDB": {"enable": true, "proxy": true, "useproxy": true, "use_chromium": true}, \
+"Rezka": {"enable": true, "proxy": true, "useproxy": true, "use_chromium": true}, \
 "Collaps": {"enable": true, "proxy": true, "useproxy": true}, \
 "HDVB": {"enable": true, "proxy": true, "useproxy": true}, \
 "Kinobase": {"enable": true, "proxy": true, "useproxy": true} \
@@ -105,4 +106,5 @@ RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && \
     chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD dotnet Core.dll --urls http://127.0.0.1:9118 & nginx -g "daemon off;"
+# Пробуждение хрома и запуск
+CMD curl -s https://lexa020788-chrome.hf.space > /dev/null && dotnet Core.dll --urls http://127.0.0.1:9118 & nginx -g "daemon off;"
