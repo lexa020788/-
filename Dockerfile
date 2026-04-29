@@ -63,7 +63,7 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
 
 RUN echo 'server { listen 8000; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# Исправлено: endpoint и параметры хрома
+# Конфиг: Хром ВЫКЛЮЧЕН, включена маскировка под Android
 RUN echo '{ \
 "listen": {"port": 9118}, \
 "server": {"host": "0.0.0.0", "allow_cors": true}, \
@@ -80,18 +80,19 @@ RUN echo '{ \
   "online_priority": ["VideoDB", "Rezka", "Collaps", "Kinobase"], \
   "plugins": ["/online.js", "/sisi.js"] \
 }, \
+"parser": { \
+  "useragent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36" \
+}, \
 "chromium": { \
-  "enable": true, \
-  "browserWSEndpoint": "https://lexa020788-chrome.hf.space/chromium", \
-  "ignoreHTTPSErrors": true, \
-  "args": ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"] \
+  "enable": false \
 } \
 }' > /lampac/init.conf
 
+# Модули: use_chromium выключен для всех
 RUN mkdir -p /lampac/system /lampac/system/config && \
 echo '{ \
-"VideoDB": {"enable": true, "proxy": true, "useproxy": true, "use_chromium": true}, \
-"Rezka": {"enable": true, "proxy": true, "useproxy": true, "use_chromium": true}, \
+"VideoDB": {"enable": true, "proxy": true, "useproxy": true, "use_chromium": false}, \
+"Rezka": {"enable": true, "proxy": true, "useproxy": true, "use_chromium": false}, \
 "Collaps": {"enable": true, "proxy": true, "useproxy": true}, \
 "HDVB": {"enable": true, "proxy": true, "useproxy": true}, \
 "Kinobase": {"enable": true, "proxy": true, "useproxy": true} \
@@ -103,5 +104,5 @@ RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && \
     chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-# Будильник: сначала пингуем хром, ждем 5 секунд и запускаем основное
-CMD curl -s https://lexa020788-chrome.hf.space > /dev/null && sleep 5 && dotnet Core.dll --urls http://127.0.0.1:9118 & nginx -g "daemon off;"
+# Запуск только Lampac и Nginx
+CMD dotnet Core.dll --urls http://127.0.0.1:9118 & nginx -g "daemon off;"
