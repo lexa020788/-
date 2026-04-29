@@ -84,7 +84,7 @@ RUN echo '{ \
 }, \
 "chromium": { \
 "enable": true, \
-"browserWSEndpoint": "wss://ССЫЛКА_НА_ТВОЙ_ХРОМ_СПЕЙС.hf.space", \
+"browserWSEndpoint": "wss://lexa0207-chrome.hf.space", \
 "args": ["--no-sandbox"] \
 } \
 }' > /lampac/init.conf
