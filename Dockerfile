@@ -36,7 +36,7 @@ FROM debian:13-slim AS runner
 ARG TARGETARCH
 ARG DOTNET_SDK_VERSION
 WORKDIR /lampac
-# Koyeb использует порт 8000 по умолчанию
+# Koyeb использует порт 8000
 EXPOSE 8000
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -62,10 +62,10 @@ COPY --from=builder /build/Core/wwwroot /lampac/wwwroot
 RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
     find /lampac/online -name "*.js" -exec cp -f {} /lampac/wwwroot/ \;
 
-# Nginx настроен на порт 8000 для Koyeb
+# Nginx на порт 8000
 RUN echo 'server { listen 8000; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# Исправлено: lowMemoryMode включен, TMDB proxy выключен, Chromium настроен на внешний адрес
+# Конфиг: lowMemoryMode=true, Surs удален, прописан внешний хром
 RUN echo '{ \
 "listen": {"port": 9118}, \
 "server": {"host": "0.0.0.0", "allow_cors": true}, \
@@ -79,20 +79,20 @@ RUN echo '{ \
 "LampaWeb": { \
 "init": true, \
 "online_js": true, \
-"online_priority": ["VideoDB", "Surs", "Rezka", "Collaps"], \
-"plugins": ["/online.js", "/sisi.js", "https://surs.me"] \
+"online_priority": ["VideoDB", "Rezka", "Collaps", "Kinobase"], \
+"plugins": ["/online.js", "/sisi.js"] \
 }, \
 "chromium": { \
 "enable": true, \
-"browserWSEndpoint": "wss://lexa020788-chrome.hf.space", \
+"browserWSEndpoint": "wss://lexa0207-chrome.hf.space/chromium", \
+"ignoreHTTPSErrors": true, \
 "args": ["--no-sandbox"] \
 } \
 }' > /lampac/init.conf
 
-# Настройки модулей (TMDB прокси удален)
+# Настройки модулей: Surs удален, VideoDB/Rezka через хром
 RUN mkdir -p /lampac/system /lampac/system/config && \
 echo '{ \
-"Surs": {"enable": true, "proxy": true, "useproxy": true}, \
 "VideoDB": {"enable": true, "proxy": true, "useproxy": true, "use_chromium": true}, \
 "Rezka": {"enable": true, "proxy": true, "useproxy": true, "use_chromium": true}, \
 "Collaps": {"enable": true, "proxy": true, "useproxy": true}, \
@@ -106,4 +106,5 @@ RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && \
     chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD dotnet Core.dll --urls http://127.0.0.1:9118 & nginx -g "daemon off;"
+# Добавлен пинг хрома для пробуждения при старте
+CMD curl -s https://hf.space > /dev/null & dotnet Core.dll --urls http://127.0.0.1:9118 & nginx -g "daemon off;"
