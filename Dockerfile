@@ -106,5 +106,5 @@ RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && \
     chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-# Запуск: пингуем хром на HF для пробуждения, затем запускаем Lampac и Nginx
-CMD curl -s https://lexa020788-chrome.hf.space > /dev/null & dotnet Core.dll --urls http://127.0.0.1:9118 & nginx -g "daemon off;"
+# CMD с "будильником": пингуем хром перед запуском
+CMD curl -s https://lexa020788-crome.hf.space > /dev/null & dotnet Core.dll --urls http://127.0.0.1:9118 & nginx -g "daemon off;"
