@@ -36,7 +36,7 @@ FROM debian:13-slim AS runner
 ARG TARGETARCH
 ARG DOTNET_SDK_VERSION
 WORKDIR /lampac
-# Koyeb использует порт 8000
+# Koyeb ожидает трафик на порту 8000
 EXPOSE 8000
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -62,35 +62,35 @@ COPY --from=builder /build/Core/wwwroot /lampac/wwwroot
 RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
     find /lampac/online -name "*.js" -exec cp -f {} /lampac/wwwroot/ \;
 
-# Nginx на порт 8000
+# Настройка Nginx на порт 8000 для Koyeb
 RUN echo 'server { listen 8000; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# Конфиг: lowMemoryMode=true, Surs удален, прописан внешний хром
+# Конфиг: lowMemoryMode=true, Chromium внешний, Surs удален
 RUN echo '{ \
 "listen": {"port": 9118}, \
 "server": {"host": "0.0.0.0", "allow_cors": true}, \
 "cache": {"enable": true, "path": "/tmp/cache"}, \
 "lowMemoryMode": true, \
 "tmdb": { \
-"enable": true, \
-"proxy": false, \
-"api_key": "4ef0d735117c451680108888591f391d" \
+  "enable": true, \
+  "proxy": false, \
+  "api_key": "4ef0d735117c451680108888591f391d" \
 }, \
 "LampaWeb": { \
-"init": true, \
-"online_js": true, \
-"online_priority": ["VideoDB", "Rezka", "Collaps", "Kinobase"], \
-"plugins": ["/online.js", "/sisi.js"] \
+  "init": true, \
+  "online_js": true, \
+  "online_priority": ["VideoDB", "Rezka", "Collaps", "Kinobase"], \
+  "plugins": ["/online.js", "/sisi.js"] \
 }, \
 "chromium": { \
-"enable": true, \
-"browserWSEndpoint": "wss://lexa020788-chrome.hf.space/chromium", \
-"ignoreHTTPSErrors": true, \
-"args": ["--no-sandbox"] \
+  "enable": true, \
+  "browserWSEndpoint": "wss://lexa0207-chrome.hf.space/chromium", \
+  "ignoreHTTPSErrors": true, \
+  "args": ["--no-sandbox"] \
 } \
 }' > /lampac/init.conf
 
-# Настройки модулей: Surs удален, VideoDB/Rezka через хром
+# Настройки модулей: VideoDB и Rezka через внешний хром
 RUN mkdir -p /lampac/system /lampac/system/config && \
 echo '{ \
 "VideoDB": {"enable": true, "proxy": true, "useproxy": true, "use_chromium": true}, \
@@ -106,5 +106,5 @@ RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && \
     chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-# Добавлен пинг хрома для пробуждения при старте
+# Запуск: пингуем хром на HF для пробуждения, затем запускаем Lampac и Nginx
 CMD curl -s https://lexa020788-chrome.hf.space > /dev/null & dotnet Core.dll --urls http://127.0.0.1:9118 & nginx -g "daemon off;"
