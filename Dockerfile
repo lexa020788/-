@@ -8,37 +8,25 @@ ARG BUILDARCH
 ARG TARGETARCH
 ARG DOTNET_SDK_VERSION
 WORKDIR /build
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl xz-utils libicu76 git && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl xz-utils libicu76 git \
-    && rm -rf /var/lib/apt/lists/*
-
+# Используем актуальный репозиторий Lampac
 RUN git clone https://github.com/lampac-nextgen/lampac .
 
-RUN case "$BUILDARCH" in \
-    arm64) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
-    *) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; \
-    esac \
-    && curl -fSL -o /tmp/dotnet-sdk.tar.gz "${SDK_URL}" \
-    && mkdir -p /usr/share/dotnet \
-    && tar -xzf /tmp/dotnet-sdk.tar.gz -C /usr/share/dotnet \
-    && rm /tmp/dotnet-sdk.tar.gz
+RUN case "$BUILDARCH" in arm64) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; *) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; esac && curl -fSL -o /tmp/dotnet-sdk.tar.gz "${SDK_URL}" && mkdir -p /usr/share/dotnet && tar -xzf /tmp/dotnet-sdk.tar.gz -C /usr/share/dotnet && rm /tmp/dotnet-sdk.tar.gz
 
-RUN case "$TARGETARCH" in \
-    arm64) RID=linux-arm64 ;; \
-    *) RID=linux-x64 ;; \
-    esac \
-    && /usr/share/dotnet/dotnet publish --configuration Release --runtime "$RID" \
-    --output /out/lampac -p:Parallel=false Core/Core.csproj
+# Компиляция
+RUN case "$TARGETARCH" in arm64) RID=linux-arm64 ;; *) RID=linux-x64 ;; esac && /usr/share/dotnet/dotnet publish --configuration Release --runtime "$RID" --output /out/lampac -p:Parallel=false Core/Core.csproj
 
 # --- Runner Stage ---
 FROM debian:13-slim AS runner
 ARG TARGETARCH
 ARG DOTNET_SDK_VERSION
 WORKDIR /lampac
+# Порт 8000 для Koyeb
 EXPOSE 8000
 
-# Устанавливаем минимум для работы (без браузеров)
+# Убраны все зависимости Chromium и сам браузер
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl libicu76 procps nginx tini \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -62,22 +50,41 @@ COPY --from=builder /build/Core/wwwroot /lampac/wwwroot
 RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
     find /lampac/online -name "*.js" -exec cp -f {} /lampac/wwwroot/ \;
 
-# Настройка Nginx прокси
-RUN echo 'server { listen 8000; location / { proxy_pass http://127.0.0.1:9118; proxy_set_header Host $host; proxy_set_header X-Real-IP $remote_addr; } }' > /etc/nginx/sites-available/default
+# Nginx: 8000 (Koyeb) -> 9118 (Lampac)
+RUN echo 'server { listen 8000; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# Создаем конфиг с твоим Jackett (Hugging Face)
+# Конфиг: Chromium ВЫКЛЮЧЕН, Jackett ВКЛЮЧЕН
 RUN echo '{ \
-  "jackett": { \
-    "enable": true, \
-    "host": "https://lexa020788-jaket.hf.space", \
-    "key": "s8bfguunqrbgfwend70p8ph5m135helo", \
-    "rutor": true, \
-    "nnm": true, \
-    "kinozal": true, \
-    "bitru": true \
-  }, \
-  "api": { "online": true, "torrent": true } \
+"listen": {"port": 9118}, \
+"server": {"host": "0.0.0.0", "allow_cors": true}, \
+"cache": {"enable": true, "path": "/tmp/cache"}, \
+"lowMemoryMode": true, \
+"tmdb": { "enable": true, "proxy": true, "api_key": "4ef0d735117c451680108888591f391d" }, \
+"jackett": { \
+  "enable": true, \
+  "host": "https://lexa020788-jaket.hf.space", \
+  "key": "s8bfguunqrbgfwend70p8ph5m135helo", \
+  "rutor": true, \
+  "nnm": true, \
+  "bitru": true \
+}, \
+"chromium": { "enable": false } \
 }' > /lampac/init.conf
 
+# Настройки источников (Chromium везде выключен)
+RUN mkdir -p /lampac/system /lampac/system/config && \
+echo '{ \
+"VideoDB": {"enable": true, "proxy": true, "use_chromium": false}, \
+"Rezka": {"enable": true, "proxy": true, "use_chromium": false}, \
+"Kinogo": {"enable": true, "proxy": true, "use_chromium": false}, \
+"Kinobase": {"enable": true, "proxy": true, "use_chromium": false}, \
+"Collaps": {"enable": true, "proxy": true}, \
+"HDVB": {"enable": true, "proxy": true}, \
+"Alloha": {"enable": true, "proxy": true} \
+}' > /lampac/system/accs.json && \
+cp /lampac/system/accs.json /lampac/system/config/accs.json
+
+RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
+
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD service nginx start && dotnet Lampac.dll
+CMD service nginx start && dotnet Core.dll --urls http://127.0.0.1:9118
