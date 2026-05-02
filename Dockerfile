@@ -31,12 +31,16 @@ RUN case "$TARGETARCH" in arm64) RID=arm64 ;; *) RID=x64 ;; esac && \
     curl -fSL -o /tmp/sdk.tar.gz "https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-${RID}.tar.gz" && \
     mkdir -p /usr/share/dotnet && tar -xzf /tmp/sdk.tar.gz -C /usr/share/dotnet && rm /tmp/sdk.tar.gz
 
+# --- НОВЫЕ ЛИМИТЫ CPU И RAM ---
 ENV PATH="${PATH}:/usr/share/dotnet" \
     DOTNET_RUNNING_IN_CONTAINER=true \
     ASPNETCORE_URLS=http://127.0.0.1:9118 \
-    # Лимит 300МБ для .NET 10, чтобы оставить 1.7ГБ для Chromium
-    DOTNET_GCHeapHardLimit=314572800 \
-    DOTNET_CLI_HOME=/tmp/dotnet_home
+    DOTNET_CLI_HOME=/tmp/dotnet_home \
+    # ЖЕСТКОЕ ОГРАНИЧЕНИЕ: 1 ядро и 256МБ ОЗУ для .NET
+    DOTNET_ProcessorCount=1 \
+    COMPlus_GCThreadCount=1 \
+    DOTNET_GCHeapHardLimit=268435456 \
+    DOTNET_TieredCompilation=0
 
 COPY --from=builder /out/lampac /lampac
 COPY --from=builder /build/Shared /lampac/shared
@@ -50,7 +54,7 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
 
 RUN echo 'server { listen 7860; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# Оптимизированный конфиг с твоим base_url
+# Оптимизированный конфиг: Chromium зажат в 1 поток
 RUN echo '{ \
 "listen": {"port": 9118}, \
 "lowMemoryMode": true, \
@@ -68,6 +72,7 @@ RUN echo '{ \
     "--no-sandbox","--disable-setuid-sandbox","--headless=new","--disable-gpu", \
     "--disable-dev-shm-usage","--no-zygote","--single-process", \
     "--disable-features=IsolateOrigins,site-per-process", \
+    "--disable-software-rasterizer","--disable-background-networking", \
     "--js-flags=\"--max-old-space-size=128\"" \
   ] \
 } \
@@ -88,4 +93,5 @@ cp /lampac/system/accs.json /lampac/system/config/accs.json
 RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD service nginx start && exec /usr/share/dotnet/dotnet /lampac/Core.dll --urls http://127.0.0.1:9118
+# Запуск с низким приоритетом (nice), чтобы не пугать мониторинг Hugging Face
+CMD service nginx start && exec nice -n 19 /usr/share/dotnet/dotnet /lampac/Core.dll --urls http://127.0.0.1:9118
