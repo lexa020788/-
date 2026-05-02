@@ -9,7 +9,7 @@ ARG TARGETARCH
 ARG DOTNET_SDK_VERSION
 WORKDIR /build
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl xz-utils libicu76 git && rm -rf /var/lib/apt/lists/*
-RUN git clone https://github.com/lampac-nextgen/lampac .
+RUN git clone --depth 1 https://github.com/lampac-nextgen/lampac .
 RUN case "$BUILDARCH" in arm64) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; *) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; esac && curl -fSL -o /tmp/dotnet-sdk.tar.gz "${SDK_URL}" && mkdir -p /usr/share/dotnet && tar -xzf /tmp/dotnet-sdk.tar.gz -C /usr/share/dotnet && rm /tmp/dotnet-sdk.tar.gz
 RUN case "$TARGETARCH" in arm64) RID=linux-arm64 ;; *) RID=linux-x64 ;; esac && /usr/share/dotnet/dotnet publish --configuration Release --runtime "$RID" --output /out/lampac -p:Parallel=false Core/Core.csproj
 
@@ -34,7 +34,8 @@ RUN case "$TARGETARCH" in arm64) RID=arm64 ;; *) RID=x64 ;; esac && \
 ENV PATH="${PATH}:/usr/share/dotnet" \
     DOTNET_RUNNING_IN_CONTAINER=true \
     ASPNETCORE_URLS=http://127.0.0.1:9118 \
-    DOTNET_GCHeapHardLimit=1C2000000 \
+    # Лимит 300МБ для .NET 10, чтобы оставить 1.7ГБ для Chromium
+    DOTNET_GCHeapHardLimit=314572800 \
     DOTNET_CLI_HOME=/tmp/dotnet_home
 
 COPY --from=builder /out/lampac /lampac
@@ -49,11 +50,9 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
 
 RUN echo 'server { listen 7860; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# Ультра-оптимизированный конфиг для Chromium в условиях малого ОЗУ
+# Оптимизированный конфиг с твоим base_url
 RUN echo '{ \
 "listen": {"port": 9118}, \
-"server": {"host": "0.0.0.0", "allow_cors": true}, \
-"cache": {"enable": true, "path": "/tmp/cache"}, \
 "lowMemoryMode": true, \
 "tmdb": { "enable": true, "proxy": true, "api_key": "4ef0d735117c451680108888591f391d" }, \
 "LampaWeb": { \
@@ -65,20 +64,15 @@ RUN echo '{ \
   "enable": true, \
   "executablePath": "/usr/bin/chromium", \
   "max_processes": 1, \
-  "diskCacheSize": 10, \
-  "memoryCacheSize": 10, \
   "args": [ \
     "--no-sandbox","--disable-setuid-sandbox","--headless=new","--disable-gpu", \
-    "--disable-dev-shm-usage","--no-zygote","--disable-extensions", \
-    "--no-first-run","--no-default-browser-check","--disable-software-rasterizer", \
+    "--disable-dev-shm-usage","--no-zygote","--single-process", \
     "--disable-features=IsolateOrigins,site-per-process", \
-    "--disable-ipc-flooding-protection","--disable-background-networking", \
-    "--js-flags=\"--max-old-space-size=128 --stack-size=1024\"" \
+    "--js-flags=\"--max-old-space-size=128\"" \
   ] \
 } \
 }' > /lampac/init.conf
 
-# Использование браузера только для Rezka (минимум нагрузки)
 RUN mkdir -p /lampac/system /lampac/system/config && \
 echo '{ \
 "VideoDB": {"enable": true, "proxy": true, "use_chromium": false}, \
@@ -94,4 +88,4 @@ cp /lampac/system/accs.json /lampac/system/config/accs.json
 RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD dotnet Core.dll --urls http://127.0.0.1:9118 & nginx -g "daemon off;"
+CMD service nginx start && exec /usr/share/dotnet/dotnet /lampac/Core.dll --urls http://127.0.0.1:9118
