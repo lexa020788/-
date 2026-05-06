@@ -65,7 +65,7 @@ RUN echo '{ \
   "api_url": "https://lexa020788-lamposhka.hf.space" \
 }, \
 "chromium": { \
-  "enable": true, \
+  "enable": false, \
   "executablePath": "/usr/bin/chromium", \
   "max_processes": 1, \
   "args": [ \
