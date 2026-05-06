@@ -20,23 +20,21 @@ ARG DOTNET_SDK_VERSION
 WORKDIR /lampac
 EXPOSE 7860
 
+# Установка только необходимых системных библиотек БЕЗ Chromium и его зависимостей
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates chromium curl fontconfig libicu76 procps nginx tini \
-    libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
-    libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 \
-    libpango-1.0-0 libasound2 libglib2.0-0 \
+    ca-certificates curl fontconfig libicu76 procps nginx tini \
+    libglib2.0-0 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN case "$TARGETARCH" in arm64) RID=arm64 ;; *) RID=x64 ;; esac && \
     curl -fSL -o /tmp/sdk.tar.gz "https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-${RID}.tar.gz" && \
     mkdir -p /usr/share/dotnet && tar -xzf /tmp/sdk.tar.gz -C /usr/share/dotnet && rm /tmp/sdk.tar.gz
 
-# --- НОВЫЕ ЛИМИТЫ CPU И RAM ---
+# --- ЛИМИТЫ CPU И RAM ---
 ENV PATH="${PATH}:/usr/share/dotnet" \
     DOTNET_RUNNING_IN_CONTAINER=true \
     ASPNETCORE_URLS=http://127.0.0.1:9118 \
     DOTNET_CLI_HOME=/tmp/dotnet_home \
-    # ЖЕСТКОЕ ОГРАНИЧЕНИЕ: 1 ядро и 256МБ ОЗУ для .NET
     DOTNET_ProcessorCount=1 \
     COMPlus_GCThreadCount=1 \
     DOTNET_GCHeapHardLimit=268435456 \
@@ -54,7 +52,7 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
 
 RUN echo 'server { listen 7860; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# Оптимизированный конфиг: Chromium зажат в 1 поток
+# Оптимизированный конфиг: Chromium ПОЛНОСТЬЮ ВЫКЛЮЧЕН
 RUN echo '{ \
 "listen": {"port": 9118}, \
 "lowMemoryMode": true, \
@@ -65,23 +63,15 @@ RUN echo '{ \
   "api_url": "https://lexa020788-lamposhka.hf.space" \
 }, \
 "chromium": { \
-  "enable": false, \
-  "executablePath": "/usr/bin/chromium", \
-  "max_processes": 1, \
-  "args": [ \
-    "--no-sandbox","--disable-setuid-sandbox","--headless=new","--disable-gpu", \
-    "--disable-dev-shm-usage","--no-zygote","--single-process", \
-    "--disable-features=IsolateOrigins,site-per-process", \
-    "--disable-software-rasterizer","--disable-background-networking", \
-    "--js-flags=\"--max-old-space-size=128\"" \
-  ] \
+  "enable": false \
 } \
 }' > /lampac/init.conf
 
+# Настройка парсеров: везде выключено использование Chromium
 RUN mkdir -p /lampac/system /lampac/system/config && \
 echo '{ \
 "VideoDB": {"enable": true, "proxy": true, "use_chromium": false}, \
-"Rezka": {"enable": true, "proxy": true, "use_chromium": true}, \
+"Rezka": {"enable": true, "proxy": true, "use_chromium": false}, \
 "Kinogo": {"enable": true, "proxy": true, "use_chromium": false}, \
 "Kinobase": {"enable": true, "proxy": true, "use_chromium": false}, \
 "Collaps": {"enable": true, "proxy": true}, \
@@ -93,5 +83,5 @@ cp /lampac/system/accs.json /lampac/system/config/accs.json
 RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-# Запуск с низким приоритетом (nice), чтобы не пугать мониторинг Hugging Face
+# Запуск без Chromium через dotnet напрямую
 CMD service nginx start && exec nice -n 19 /usr/share/dotnet/dotnet /lampac/Core.dll --urls http://127.0.0.1:9118
