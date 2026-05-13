@@ -66,17 +66,16 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
 
 RUN echo 'server { listen 7860; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# Конфигурация с Chromium на полную мощность (без лимитов V8 и ограничений процессов)
+# Оптимизированная конфигурация init.conf с вашими ссылками Hugging Face Space
 RUN echo '{ \
   "listen": {"port": 9118}, \
   "server": {"host": "0.0.0.0", "allow_cors": true}, \
   "cache": {"enable": true, "path": "/tmp/cache"}, \
   "lowMemoryMode": false, \
-  "tmdb": { "enable": true, "proxy": true, "api_key": "TMDB_SECRET_KEY" }, \
   "LampaWeb": { \
     "init": true, \
-    "base_url": "https://lexa020788-lampac.hf.space", \
-    "api_url": "https://lexa020788-lampac.hf.space" \
+    "base_url": "https://lexa020788-lamposhka.hf.space", \
+    "api_url": "https://lexa020788-lamposhka.hf.space" \
   }, \
   "chromium": { \
     "enable": true, \
@@ -94,20 +93,23 @@ RUN echo '{ \
   } \
 }' > /lampac/init.conf
 
-# Использование браузера только для Rezka
+# Глубокая настройка балансеров (Rezka и Kinogo работают напрямую через полноценный Chromium)
 RUN mkdir -p /lampac/system /lampac/system/config && \
     echo '{ \
-      "VideoDB": {"enable": true, "proxy": false, "use_chromium": true}, \
+      "VideoDB": {"enable": true, "proxy": true, "use_chromium": false}, \
       "Rezka": {"enable": true, "proxy": false, "use_chromium": true}, \
       "Kinogo": {"enable": true, "proxy": false, "use_chromium": true}, \
-      "Kinobase": {"enable": true, "proxy": false, "use_chromium": true}, \
-      "Collaps": {"enable": true, "proxy": false}, \
-      "HDVB": {"enable": true, "proxy": false}, \
-      "Alloha": {"enable": true, "proxy": false} \
+      "Kinobase": {"enable": true, "proxy": true, "use_chromium": false}, \
+      "Collaps": {"enable": true, "proxy": true}, \
+      "HDVB": {"enable": true, "proxy": true}, \
+      "Alloha": {"enable": true, "proxy": true}, \
+      "Voidboost": {"enable": true, "proxy": true}, \
+      "Ashdi": {"enable": true, "proxy": true}, \
+      "Filmix": {"enable": true, "proxy": true, "use_chromium": false} \
     }' > /lampac/system/accs.json && \
     cp /lampac/system/accs.json /lampac/system/config/accs.json
 
 RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD service nginx start && sed -i "s/TMDB_SECRET_KEY/$TMDB_API_KEY/g" /lampac/init.conf && exec dotnet Core.dll --urls http://127.0.0.1:9118
+CMD service nginx start && exec dotnet Core.dll --urls http://127.0.0.1:9118
