@@ -66,7 +66,7 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
 
 RUN echo 'server { listen 7860; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# Оптимизированная конфигурация init.conf с вашими ссылками Hugging Face Space
+# Конфигурация init.conf с Chromium на полную мощность и без жестко прописанного токена TMDB
 RUN echo '{ \
   "listen": {"port": 9118}, \
   "server": {"host": "0.0.0.0", "allow_cors": true}, \
@@ -74,8 +74,8 @@ RUN echo '{ \
   "lowMemoryMode": false, \
   "LampaWeb": { \
     "init": true, \
-    "base_url": "https://lexa020788-lamposhka.hf.space", \
-    "api_url": "https://lexa020788-lamposhka.hf.space" \
+    "base_url": "https://lexa020788-lampac.hf.space", \
+    "api_url": "https://lexa020788-lampac.hf.space" \
   }, \
   "chromium": { \
     "enable": true, \
@@ -93,7 +93,7 @@ RUN echo '{ \
   } \
 }' > /lampac/init.conf
 
-# Глубокая настройка балансеров (Rezka и Kinogo работают напрямую через полноценный Chromium)
+# Настройка балансеров: Rezka и Kinogo идут напрямую через Chromium, добавлены Voidboost, Ashdi, Filmix
 RUN mkdir -p /lampac/system /lampac/system/config && \
     echo '{ \
       "VideoDB": {"enable": true, "proxy": true, "use_chromium": false}, \
