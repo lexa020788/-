@@ -97,13 +97,13 @@ RUN echo '{ \
 # Использование браузера только для Rezka
 RUN mkdir -p /lampac/system /lampac/system/config && \
     echo '{ \
-      "VideoDB": {"enable": true, "proxy": true, "use_chromium": true}, \
-      "Rezka": {"enable": true, "proxy": true, "use_chromium": true}, \
-      "Kinogo": {"enable": true, "proxy": true, "use_chromium": true}, \
-      "Kinobase": {"enable": true, "proxy": true, "use_chromium": true}, \
-      "Collaps": {"enable": true, "proxy": true}, \
-      "HDVB": {"enable": true, "proxy": true}, \
-      "Alloha": {"enable": true, "proxy": true} \
+      "VideoDB": {"enable": true, "proxy": false, "use_chromium": true}, \
+      "Rezka": {"enable": true, "proxy": false, "use_chromium": true}, \
+      "Kinogo": {"enable": true, "proxy": false, "use_chromium": true}, \
+      "Kinobase": {"enable": true, "proxy": false, "use_chromium": true}, \
+      "Collaps": {"enable": true, "proxy": false}, \
+      "HDVB": {"enable": true, "proxy": false}, \
+      "Alloha": {"enable": true, "proxy": false} \
     }' > /lampac/system/accs.json && \
     cp /lampac/system/accs.json /lampac/system/config/accs.json
 
