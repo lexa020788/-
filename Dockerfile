@@ -66,7 +66,7 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
 
 RUN echo 'server { listen 7860; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# Ультра-оптимизированный конфиг для Chromium в условиях малого ОЗУ (без явного ключа TMDB)
+# Конфигурация с расширенными лимитами памяти для стабильного парсинга балансеров
 RUN echo '{ \
   "listen": {"port": 9118}, \
   "server": {"host": "0.0.0.0", "allow_cors": true}, \
@@ -81,17 +81,16 @@ RUN echo '{ \
   "chromium": { \
     "enable": true, \
     "executablePath": "/usr/bin/chromium", \
-    "max_processes": 1, \
-    "diskCacheSize": 10, \
-    "memoryCacheSize": 10, \
+    "max_processes": 2, \
+    "diskCacheSize": 50, \
+    "memoryCacheSize": 50, \
     "args": [ \
-      "--no-sandbox","--disable-setuid-sandbox","--headless=old","--disable-gpu", \
+      "--no-sandbox","--disable-setuid-sandbox","--headless=new","--disable-gpu", \
       "--disable-dev-shm-usage","--no-zygote","--disable-extensions", \
       "--no-first-run","--no-default-browser-check","--disable-software-rasterizer", \
       "--disable-features=IsolateOrigins,site-per-process", \
       "--disable-ipc-flooding-protection","--disable-background-networking", \
-      "--single-process", \
-      "--js-flags=\\\"--max-old-space-size=128 --stack-size=1024\\\"" \
+      "--js-flags=\\\"--max-old-space-size=384 --stack-size=2048\\\"" \
     ] \
   } \
 }' > /lampac/init.conf
