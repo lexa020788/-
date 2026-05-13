@@ -66,12 +66,12 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
 
 RUN echo 'server { listen 7860; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# Конфигурация с расширенными лимитами памяти для стабильного парсинга балансеров
+# Конфигурация с Chromium на полную мощность (без лимитов V8 и ограничений процессов)
 RUN echo '{ \
   "listen": {"port": 9118}, \
   "server": {"host": "0.0.0.0", "allow_cors": true}, \
   "cache": {"enable": true, "path": "/tmp/cache"}, \
-  "lowMemoryMode": true, \
+  "lowMemoryMode": false, \
   "tmdb": { "enable": true, "proxy": true, "api_key": "TMDB_SECRET_KEY" }, \
   "LampaWeb": { \
     "init": true, \
@@ -81,16 +81,15 @@ RUN echo '{ \
   "chromium": { \
     "enable": true, \
     "executablePath": "/usr/bin/chromium", \
-    "max_processes": 2, \
-    "diskCacheSize": 50, \
-    "memoryCacheSize": 50, \
+    "max_processes": 0, \
+    "diskCacheSize": 0, \
+    "memoryCacheSize": 0, \
     "args": [ \
       "--no-sandbox","--disable-setuid-sandbox","--headless=new","--disable-gpu", \
       "--disable-dev-shm-usage","--no-zygote","--disable-extensions", \
       "--no-first-run","--no-default-browser-check","--disable-software-rasterizer", \
       "--disable-features=IsolateOrigins,site-per-process", \
-      "--disable-ipc-flooding-protection","--disable-background-networking", \
-      "--js-flags=\\\"--max-old-space-size=384 --stack-size=2048\\\"" \
+      "--disable-ipc-flooding-protection","--disable-background-networking" \
     ] \
   } \
 }' > /lampac/init.conf
