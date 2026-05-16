@@ -8,24 +8,10 @@ ARG BUILDARCH
 ARG TARGETARCH
 ARG DOTNET_SDK_VERSION
 WORKDIR /build
-
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl xz-utils libicu76 git && rm -rf /var/lib/apt/lists/*
-RUN git clone --depth 1 https://github.com/lampac-nextgen/lampac .
-
-RUN case "$BUILDARCH" in \
-      arm64) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
-      *) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; \
-    esac && \
-    curl -fSL -o /tmp/dotnet-sdk.tar.gz "${SDK_URL}" && \
-    mkdir -p /usr/share/dotnet && \
-    tar -xzf /tmp/dotnet-sdk.tar.gz -C /usr/share/dotnet && \
-    rm /tmp/dotnet-sdk.tar.gz
-
-RUN case "$TARGETARCH" in \
-      arm64) RID=linux-arm64 ;; \
-      *) RID=linux-x64 ;; \
-    esac && \
-    /usr/share/dotnet/dotnet publish --configuration Release --runtime "$RID" --output /out/lampac -p:Parallel=false Core/Core.csproj
+RUN git clone https://github.com/lampac-nextgen/lampac .
+RUN case "$BUILDARCH" in arm64) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; *) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; esac && curl -fSL -o /tmp/dotnet-sdk.tar.gz "${SDK_URL}" && mkdir -p /usr/share/dotnet && tar -xzf /tmp/dotnet-sdk.tar.gz -C /usr/share/dotnet && rm /tmp/dotnet-sdk.tar.gz
+RUN case "$TARGETARCH" in arm64) RID=linux-arm64 ;; *) RID=linux-x64 ;; esac && /usr/share/dotnet/dotnet publish --configuration Release --runtime "$RID" --output /out/lampac -p:Parallel=false Core/Core.csproj
 
 # --- Runner Stage ---
 FROM debian:13-slim AS runner
@@ -33,29 +19,21 @@ ARG TARGETARCH
 ARG DOTNET_SDK_VERSION
 WORKDIR /lampac
 EXPOSE 7860
-
-# Установка только необходимых системных библиотек БЕЗ Chromium и его зависимостей
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl fontconfig libicu76 procps nginx tini \
-    libglib2.0-0 \
+    ca-certificates chromium curl fontconfig libicu76 procps nginx tini \
+    libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+    libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 \
+    libpango-1.0-0 libasound2 libglib2.0-0 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-RUN case "$TARGETARCH" in \
-      arm64) RID=arm64 ;; \
-      *) RID=x64 ;; \
-    esac && \
+RUN case "$TARGETARCH" in arm64) RID=arm64 ;; *) RID=x64 ;; esac && \
     curl -fSL -o /tmp/sdk.tar.gz "https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-${RID}.tar.gz" && \
     mkdir -p /usr/share/dotnet && tar -xzf /tmp/sdk.tar.gz -C /usr/share/dotnet && rm /tmp/sdk.tar.gz
 
-# --- ЛИМИТЫ CPU И RAM ---
 ENV PATH="${PATH}:/usr/share/dotnet" \
     DOTNET_RUNNING_IN_CONTAINER=true \
     ASPNETCORE_URLS=http://127.0.0.1:9118 \
-    DOTNET_CLI_HOME=/tmp/dotnet_home \
-    DOTNET_ProcessorCount=1 \
-    COMPlus_GCThreadCount=1 \
-    DOTNET_GCHeapHardLimit=268435456 \
-    DOTNET_TieredCompilation=0
+    DOTNET_GCHeapHardLimit=1C2000000 \
+    DOTNET_CLI_HOME=/tmp/dotnet_home
 
 COPY --from=builder /out/lampac /lampac
 COPY --from=builder /build/Shared /lampac/shared
@@ -69,38 +47,59 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
 
 RUN echo 'server { listen 7860; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# Оптимизированный конфиг: Chromium ПОЛНОСТЬЮ ВЫКЛЮЧЕН, API-ключ TMDB УДАЛЕН
+# Конфиг Chromium со стандартным поведением (ограничения убраны, таймаут 120с сохранен)
 RUN echo '{ \
   "listen": {"port": 9118}, \
-  "lowMemoryMode": true, \
+  "server": {"host": "0.0.0.0", "allow_cors": true}, \
+  "cache": {"enable": true, "path": "/tmp/cache"}, \
+  "lowMemoryMode": false, \
+  "tmdb": { "enable": true, "proxy": true, "api_key": "4ef0d735117c451680108888591f391d" }, \
   "LampaWeb": { \
     "init": true, \
-    "base_url": "https://lexa020788-lamposhka.hf.space", \
-    "api_url": "https://lexa020788-lamposhka.hf.space" \
+    "base_url": "https://lexa020788-lampac.hf.space", \
+    "api_url": "https://lexa020788-lampac.hf.space" \
   }, \
   "chromium": { \
-    "enable": false \
+    "enable": true, \
+    "puppets": true, \
+    "timeout": 120000, \
+    "executablePath": "/usr/bin/chromium", \
+    "max_processes": 0, \
+    "diskCacheSize": 0, \
+    "memoryCacheSize": 0, \
+    "args": [ \
+      "--no-sandbox", \
+      "--disable-setuid-sandbox", \
+      "--headless=new", \
+      "--disable-gpu", \
+      "--disable-dev-shm-usage", \
+      "--no-first-run", \
+      "--no-default-browser-check" \
+    ] \
   } \
 }' > /lampac/init.conf
 
-# Настройка парсеров: использование Chromium выключено, включены дополнительные балансеры
+# Сохраняем использование браузера для Rezka и Kinobase
 RUN mkdir -p /lampac/system /lampac/system/config && \
     echo '{ \
       "VideoDB": {"enable": true, "proxy": true, "use_chromium": false}, \
-      "Rezka": {"enable": true, "proxy": true, "use_chromium": false}, \
+      "Rezka": {"enable": true, "proxy": true, "use_chromium": true}, \
       "Kinogo": {"enable": true, "proxy": true, "use_chromium": false}, \
-      "Kinobase": {"enable": true, "proxy": true, "use_chromium": false}, \
+      "Kinobase": {"enable": true, "proxy": true, "use_chromium": true}, \
       "Collaps": {"enable": true, "proxy": true}, \
       "HDVB": {"enable": true, "proxy": true}, \
-      "Alloha": {"enable": true, "proxy": true}, \
-      "Voidboost": {"enable": true, "proxy": true}, \
-      "Ashdi": {"enable": true, "proxy": true}, \
-      "Filmix": {"enable": true, "proxy": true, "use_chromium": false} \
+      "Alloha": {"enable": true, "proxy": true} \
     }' > /lampac/system/accs.json && \
     cp /lampac/system/accs.json /lampac/system/config/accs.json
 
 RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
 
+# Скрипт запуска под tini
+RUN echo '#!/bin/bash\n\
+nginx &\n\
+export DOTNET_GCHeapHardLimit=1C2000000\n\
+exec dotnet Core.dll --urls http://127.0.0.1:9118' > /lampac/entrypoint.sh && \
+chmod +x /lampac/entrypoint.sh
+
 ENTRYPOINT ["/usr/bin/tini", "--"]
-# Запуск без Chromium через dotnet напрямую (исправлен путь запуска)
-CMD service nginx start && exec nice -n 19 /usr/share/dotnet/dotnet Core.dll --urls http://127.0.0.1:9118
+CMD ["/lampac/entrypoint.sh"]
