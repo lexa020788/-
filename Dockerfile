@@ -47,7 +47,7 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
 
 RUN echo 'server { listen 7860; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# Конфиг Chromium со стандартным поведением (ограничения убраны, таймаут 120с сохранен)
+# Конфиг Chromium (таймаут 120с сохранен, ограничения убраны)
 RUN echo '{ \
   "listen": {"port": 9118}, \
   "server": {"host": "0.0.0.0", "allow_cors": true}, \
@@ -79,16 +79,16 @@ RUN echo '{ \
   } \
 }' > /lampac/init.conf
 
-# Сохраняем использование браузера для Rezka и Kinobase
+# ИСПРАВЛЕНО: Chromium теперь включен ("use_chromium": true) абсолютно для ВСЕХ источников
 RUN mkdir -p /lampac/system /lampac/system/config && \
     echo '{ \
-      "VideoDB": {"enable": true, "proxy": true, "use_chromium": false}, \
+      "VideoDB": {"enable": true, "proxy": true, "use_chromium": true}, \
       "Rezka": {"enable": true, "proxy": true, "use_chromium": true}, \
-      "Kinogo": {"enable": true, "proxy": true, "use_chromium": false}, \
+      "Kinogo": {"enable": true, "proxy": true, "use_chromium": true}, \
       "Kinobase": {"enable": true, "proxy": true, "use_chromium": true}, \
-      "Collaps": {"enable": true, "proxy": true}, \
-      "HDVB": {"enable": true, "proxy": true}, \
-      "Alloha": {"enable": true, "proxy": true} \
+      "Collaps": {"enable": true, "proxy": true, "use_chromium": true}, \
+      "HDVB": {"enable": true, "proxy": true, "use_chromium": true}, \
+      "Alloha": {"enable": true, "proxy": true, "use_chromium": true} \
     }' > /lampac/system/accs.json && \
     cp /lampac/system/accs.json /lampac/system/config/accs.json
 
