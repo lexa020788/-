@@ -62,7 +62,7 @@ RUN echo '{ \
   "chromium": { \
     "enable": true, \
     "puppets": true, \
-    "timeout": 120000, \
+    "timeout": 180000, \
     "executablePath": "/usr/bin/chromium", \
     "max_processes": 0, \
     "diskCacheSize": 0, \
@@ -83,6 +83,10 @@ RUN echo '{ \
 RUN mkdir -p /lampac/system /lampac/system/config && \
     echo '{ \
       "VideoDB": {"enable": true, "proxy": true, "use_chromium": true}, \
+      "VDB": {"enable": true, "proxy": true, "use_chromium": true}, \
+      "vdb": {"enable": true, "proxy": true, "use_chromium": true}, \
+      "PizdatoeHD": {"enable": true, "proxy": true, "use_chromium": true}, \
+      "pizdatoehd": {"enable": true, "proxy": true, "use_chromium": true}, \
       "Rezka": {"enable": true, "proxy": true, "use_chromium": true}, \
       "Kinogo": {"enable": true, "proxy": true, "use_chromium": true}, \
       "Kinobase": {"enable": true, "proxy": true, "use_chromium": true}, \
