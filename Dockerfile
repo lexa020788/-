@@ -19,22 +19,20 @@ ARG TARGETARCH
 ARG DOTNET_SDK_VERSION
 WORKDIR /lampac
 EXPOSE 7860
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates chromium curl fontconfig libicu76 procps nginx tini \
     libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
     libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 \
     libpango-1.0-0 libasound2 libglib2.0-0 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
-
 RUN case "$TARGETARCH" in arm64) RID=arm64 ;; *) RID=x64 ;; esac && \
     curl -fSL -o /tmp/sdk.tar.gz "https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-${RID}.tar.gz" && \
     mkdir -p /usr/share/dotnet && tar -xzf /tmp/sdk.tar.gz -C /usr/share/dotnet && rm /tmp/sdk.tar.gz
 
-# ИСПРАВЛЕНО: Полностью удалена переменная DOTNET_GCHeapHardLimit для свободного выделения ОЗУ под HD
 ENV PATH="${PATH}:/usr/share/dotnet" \
     DOTNET_RUNNING_IN_CONTAINER=true \
     ASPNETCORE_URLS=http://127.0.0.1:9118 \
+    DOTNET_GCHeapHardLimit=1C2000000 \
     DOTNET_CLI_HOME=/tmp/dotnet_home
 
 COPY --from=builder /out/lampac /lampac
@@ -49,15 +47,11 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
 
 RUN echo 'server { listen 7860; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# Подготовка структуры папок Lampac NextGen
-RUN mkdir -p /lampac/system /lampac/system/config /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home
-
-# ИСПРАВЛЕНО: Конфиг init.conf теперь пишется в правильную директорию system/config.
-# Добавлен реальный User-Agent и выделены лимиты процессов для стабильного парсинга медиапотоков.
+# Конфиг Chromium (таймаут 120с сохранен, ограничения убраны)
 RUN echo '{ \
   "listen": {"port": 9118}, \
   "server": {"host": "0.0.0.0", "allow_cors": true}, \
-  "cache": {"enable": true, "path": "/lampac/cache"}, \
+  "cache": {"enable": true, "path": "/tmp/cache"}, \
   "lowMemoryMode": false, \
   "tmdb": { "enable": true, "proxy": true, "api_key": "4ef0d735117c451680108888591f391d" }, \
   "LampaWeb": { \
@@ -70,9 +64,9 @@ RUN echo '{ \
     "puppets": true, \
     "timeout": 120000, \
     "executablePath": "/usr/bin/chromium", \
-    "max_processes": 5, \
-    "diskCacheSize": 104857600, \
-    "memoryCacheSize": 104857600, \
+    "max_processes": 0, \
+    "diskCacheSize": 0, \
+    "memoryCacheSize": 0, \
     "args": [ \
       "--no-sandbox", \
       "--disable-setuid-sandbox", \
@@ -80,30 +74,30 @@ RUN echo '{ \
       "--disable-gpu", \
       "--disable-dev-shm-usage", \
       "--no-first-run", \
-      "--no-default-browser-check", \
-      "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" \
+      "--no-default-browser-check" \
     ] \
   } \
-}' > /lampac/system/config/init.conf
+}' > /lampac/init.conf
 
-# ИСПРАВЛЕНО: "VideoDB" заменен на легитимные ключи "VDB" и "vdb".
-# Все файлы конфигураций пишутся строго в /lampac/system/config/.
-RUN echo '{ \
-  "VDB": {"enable": true, "proxy": true, "use_chromium": true}, \
-  "vdb": {"enable": true, "proxy": true, "use_chromium": true}, \
-  "Rezka": {"enable": true, "proxy": true, "use_chromium": true}, \
-  "Kinogo": {"enable": true, "proxy": true, "use_chromium": true}, \
-  "Kinobase": {"enable": true, "proxy": true, "use_chromium": true}, \
-  "Collaps": {"enable": true, "proxy": true, "use_chromium": true}, \
-  "HDVB": {"enable": true, "proxy": true, "use_chromium": true}, \
-  "Alloha": {"enable": true, "proxy": true, "use_chromium": true} \
-}' > /lampac/system/config/accs.json
+# ИСПРАВЛЕНО: Chromium теперь включен ("use_chromium": true) абсолютно для ВСЕХ источников
+RUN mkdir -p /lampac/system /lampac/system/config && \
+    echo '{ \
+      "VDB": {"enable": true, "proxy": true, "use_chromium": true}, \
+      "Rezka": {"enable": true, "proxy": true, "use_chromium": true}, \
+      "Kinogo": {"enable": true, "proxy": true, "use_chromium": true}, \
+      "Kinobase": {"enable": true, "proxy": true, "use_chromium": true}, \
+      "Collaps": {"enable": true, "proxy": true, "use_chromium": true}, \
+      "HDVB": {"enable": true, "proxy": true, "use_chromium": true}, \
+      "Alloha": {"enable": true, "proxy": true, "use_chromium": true} \
+    }' > /lampac/system/accs.json && \
+    cp /lampac/system/accs.json /lampac/system/config/accs.json
 
-RUN chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
+RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
 
-# ИСПРАВЛЕНО: Из скрипта запуска также вырезан экспорт лимита GC кучи
+# Скрипт запуска под tini
 RUN echo '#!/bin/bash\n\
 nginx &\n\
+export DOTNET_GCHeapHardLimit=1C2000000\n\
 exec dotnet Core.dll --urls http://127.0.0.1:9118' > /lampac/entrypoint.sh && \
 chmod +x /lampac/entrypoint.sh
 
