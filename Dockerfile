@@ -82,7 +82,7 @@ RUN echo '{ \
 # ИСПРАВЛЕНО: Chromium теперь включен ("use_chromium": true) абсолютно для ВСЕХ источников
 RUN mkdir -p /lampac/system /lampac/system/config && \
     echo '{ \
-      "VDB": {"enable": true, "proxy": true, "use_chromium": true}, \
+      "VideoDB": {"enable": true, "proxy": true, "use_chromium": true}, \
       "Rezka": {"enable": true, "proxy": true, "use_chromium": true}, \
       "Kinogo": {"enable": true, "proxy": true, "use_chromium": true}, \
       "Kinobase": {"enable": true, "proxy": true, "use_chromium": true}, \
