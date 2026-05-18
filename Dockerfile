@@ -56,13 +56,13 @@ RUN echo '{ \
   "tmdb": { "enable": true, "proxy": true, "api_key": "4ef0d735117c451680108888591f391d" }, \
   "LampaWeb": { \
     "init": true, \
-    "base_url": "https://lexa020788-lamposhka.hf.space", \
+    "base_url": "https://lexa020788-lamposka.hf.space", \
     "api_url": "https://lexa020788-lamposhka.hf.space" \
   }, \
   "chromium": { \
     "enable": true, \
     "puppets": true, \
-    "timeout": 300000, \
+    "timeout": 180000, \
     "executablePath": "/usr/bin/chromium", \
     "max_processes": 0, \
     "diskCacheSize": 0, \
