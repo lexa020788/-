@@ -54,12 +54,12 @@ RUN echo '{ \
   "cache": {"enable": true, "path": "/tmp/cache"}, \
   "lowMemoryMode": false, \
   "auth": true, \
-  "token": "vash_sekretny_token_AlenaA", \
+  "token": "AlenaA", \
   "tmdb": { "enable": true, "proxy": true, "api_key": "4ef0d735117c451680108888591f391d" }, \
   "LampaWeb": { \
     "init": true, \
-    "base_url": "https://lexa020788-lamposhka.hf.space", \
-    "api_url": "https://lexa020788-lamposhka.hf.space" \
+    "base_url": "https://lexa020788-lamposhka.hf.space/?token=AlenaA", \
+    "api_url": "https://lexa020788-lamposhka.hf.space/?token=AlenaA" \
   }, \
   "chromium": { \
     "enable": true, \
