@@ -47,17 +47,12 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
 
 RUN echo 'server { listen 7860; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# Конфиг Chromium (ИСПРАВЛЕНО: включена жесткая авторизация по логину и паролю)
+# Конфиг Chromium (таймаут 120с сохранен, ограничения убраны)
 RUN echo '{ \
   "listen": {"port": 9118}, \
   "server": {"host": "0.0.0.0", "allow_cors": true}, \
   "cache": {"enable": true, "path": "/tmp/cache"}, \
   "lowMemoryMode": false, \
-  "basic_auth": { \
-    "enable": true, \
-    "login": "AlenaA", \
-    "password": "AlenaA" \
-  }, \
   "tmdb": { "enable": true, "proxy": true, "api_key": "4ef0d735117c451680108888591f391d" }, \
   "LampaWeb": { \
     "init": true, \
@@ -84,7 +79,7 @@ RUN echo '{ \
   } \
 }' > /lampac/init.conf
 
-# Chromium включен ("use_chromium": true) абсолютно для ВСЕХ источников
+# ИСПРАВЛЕНО: Chromium теперь включен ("use_chromium": true) абсолютно для ВСЕХ источников
 RUN mkdir -p /lampac/system /lampac/system/config && \
     echo '{ \
       "VideoDB": {"enable": true, "proxy": true, "use_chromium": true}, \
