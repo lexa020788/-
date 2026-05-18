@@ -58,8 +58,8 @@ RUN echo '{ \
   "tmdb": { "enable": true, "proxy": true, "api_key": "4ef0d735117c451680108888591f391d" }, \
   "LampaWeb": { \
     "init": true, \
-    "base_url": "https://lexa020788-lampac.hf.space", \
-    "api_url": "https://lexa020788-lampac.hf.space" \
+    "base_url": "https://lexa020788-lamposhka.hf.space", \
+    "api_url": "https://lexa020788-lamposhka.hf.space" \
   }, \
   "chromium": { \
     "enable": true, \
