@@ -47,10 +47,11 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
 
 RUN echo 'server { listen 7860; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# Конфиг Chromium (таймаут 120с сохранен, ограничения убраны)
+# Конфиг Chromium (Добавлена авторизация через плейсхолдер TOKEN_PLACEHOLDER)
 RUN echo '{ \
   "listen": {"port": 9118}, \
   "server": {"host": "0.0.0.0", "allow_cors": true}, \
+  "auth": {"token": "TOKEN_PLACEHOLDER"}, \
   "cache": {"enable": true, "path": "/tmp/cache"}, \
   "lowMemoryMode": false, \
   "tmdb": { "enable": true, "proxy": true, "api_key": "4ef0d735117c451680108888591f391d" }, \
@@ -98,9 +99,12 @@ RUN mkdir -p /lampac/system /lampac/system/config && \
 
 RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
 
-# Скрипт запуска под tini
+# Скрипт запуска под tini (Добавлена замена плейсхолдера реальным секретом)
 RUN echo '#!/bin/bash\n\
 nginx &\n\
+if [ ! -z "${LAMPAC_TOKEN}" ]; then\n\
+  sed -i "s/TOKEN_PLACEHOLDER/${LAMPAC_TOKEN}/g" /lampac/init.conf\n\
+fi\n\
 export DOTNET_GCHeapHardLimit=1C2000000\n\
 exec dotnet Core.dll --urls http://127.0.0.1:9118' > /lampac/entrypoint.sh && \
 chmod +x /lampac/entrypoint.sh
