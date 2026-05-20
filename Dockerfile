@@ -45,33 +45,19 @@ COPY --from=builder /build/Core/wwwroot /lampac/wwwroot
 RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
     find /lampac/online -name "*.js" -exec cp -f {} /lampac/wwwroot/ \;
 
-# ИСПРАВЛЕНО: Добавлены заголовки проксирования для бесперебойной работы за прокси HF
-RUN echo 'server { \
-    listen 7860; \
-    location / { \
-        proxy_pass http://127.0.0.1:9118; \
-        proxy_http_version 1.1; \
-        proxy_set_header Upgrade $http_upgrade; \
-        proxy_set_header Connection "upgrade"; \
-        proxy_set_header Host $host; \
-        proxy_set_header X-Real-IP $remote_addr; \
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
-        proxy_set_header X-Forwarded-Proto $scheme; \
-    } \
-}' > /etc/nginx/sites-available/default
+RUN echo 'server { listen 7860; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
 
-# ИСПРАВЛЕНО: base_url и api_url изменены со статического домена на универсальный относительный путь /proxy/7860/
+# Конфиг Chromium (таймаут 120с сохранен, ограничения убраны)
 RUN echo '{ \
   "listen": {"port": 9118}, \
   "server": {"host": "0.0.0.0", "allow_cors": true}, \
-  "auth": {"token": "TOKEN_PLACEHOLDER"}, \
   "cache": {"enable": true, "path": "/tmp/cache"}, \
   "lowMemoryMode": false, \
   "tmdb": { "enable": true, "proxy": true, "api_key": "4ef0d735117c451680108888591f391d" }, \
   "LampaWeb": { \
     "init": true, \
-    "base_url": "/proxy/7860/", \
-    "api_url": "/proxy/7860/" \
+    "base_url": "https://lexa020788-lamposhka.hf.space", \
+    "api_url": "https://lexa020788-lamposhka.hf.space" \
   }, \
   "chromium": { \
     "enable": true, \
@@ -93,6 +79,7 @@ RUN echo '{ \
   } \
 }' > /lampac/init.conf
 
+# ИСПРАВЛЕНО: Chromium теперь включен ("use_chromium": true) абсолютно для ВСЕХ источников
 RUN mkdir -p /lampac/system /lampac/system/config && \
     echo '{ \
       "VideoDB": {"enable": true, "proxy": true, "use_chromium": true}, \
@@ -111,11 +98,9 @@ RUN mkdir -p /lampac/system /lampac/system/config && \
 
 RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
 
+# Скрипт запуска под tini
 RUN echo '#!/bin/bash\n\
 nginx &\n\
-if [ ! -z "${LAMPAC_TOKEN}" ]; then\n\
-  sed -i "s/TOKEN_PLACEHOLDER/${LAMPAC_TOKEN}/g" /lampac/init.conf\n\
-fi\n\
 export DOTNET_GCHeapHardLimit=1C2000000\n\
 exec dotnet Core.dll --urls http://127.0.0.1:9118' > /lampac/entrypoint.sh && \
 chmod +x /lampac/entrypoint.sh
