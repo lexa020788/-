@@ -45,9 +45,22 @@ COPY --from=builder /build/Core/wwwroot /lampac/wwwroot
 RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
     find /lampac/online -name "*.js" -exec cp -f {} /lampac/wwwroot/ \;
 
-RUN echo 'server { listen 7860; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
+# ИСПРАВЛЕНО: Добавлены заголовки проксирования для бесперебойной работы за прокси HF
+RUN echo 'server { \
+    listen 7860; \
+    location / { \
+        proxy_pass http://127.0.0.1:9118; \
+        proxy_http_version 1.1; \
+        proxy_set_header Upgrade $http_upgrade; \
+        proxy_set_header Connection "upgrade"; \
+        proxy_set_header Host $host; \
+        proxy_set_header X-Real-IP $remote_addr; \
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
+        proxy_set_header X-Forwarded-Proto $scheme; \
+    } \
+}' > /etc/nginx/sites-available/default
 
-# Конфиг Chromium (Добавлена авторизация через плейсхолдер TOKEN_PLACEHOLDER)
+# ИСПРАВЛЕНО: base_url и api_url изменены со статического домена на универсальный относительный путь /proxy/7860/
 RUN echo '{ \
   "listen": {"port": 9118}, \
   "server": {"host": "0.0.0.0", "allow_cors": true}, \
@@ -57,8 +70,8 @@ RUN echo '{ \
   "tmdb": { "enable": true, "proxy": true, "api_key": "4ef0d735117c451680108888591f391d" }, \
   "LampaWeb": { \
     "init": true, \
-    "base_url": "https://lexa020788-lamposhka.hf.space", \
-    "api_url": "https://lexa020788-lamposhka.hf.space" \
+    "base_url": "/proxy/7860/", \
+    "api_url": "/proxy/7860/" \
   }, \
   "chromium": { \
     "enable": true, \
@@ -80,7 +93,6 @@ RUN echo '{ \
   } \
 }' > /lampac/init.conf
 
-# ИСПРАВЛЕНО: Chromium теперь включен ("use_chromium": true) абсолютно для ВСЕХ источников
 RUN mkdir -p /lampac/system /lampac/system/config && \
     echo '{ \
       "VideoDB": {"enable": true, "proxy": true, "use_chromium": true}, \
@@ -99,7 +111,6 @@ RUN mkdir -p /lampac/system /lampac/system/config && \
 
 RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
 
-# Скрипт запуска под tini (Добавлена замена плейсхолдера реальным секретом)
 RUN echo '#!/bin/bash\n\
 nginx &\n\
 if [ ! -z "${LAMPAC_TOKEN}" ]; then\n\
