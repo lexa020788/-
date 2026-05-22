@@ -10,8 +10,17 @@ ARG DOTNET_SDK_VERSION
 WORKDIR /build
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl xz-utils libicu76 git && rm -rf /var/lib/apt/lists/*
 RUN git clone https://github.com/lampac-nextgen/lampac .
-RUN case "$BUILDARCH" in arm64) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; *) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; esac && curl -fSL -o /tmp/dotnet-sdk.tar.gz "${SDK_URL}" && mkdir -p /usr/share/dotnet && tar -xzf /tmp/dotnet-sdk.tar.gz -C /usr/share/dotnet && rm /tmp/dotnet-sdk.tar.gz
-RUN case "$TARGETARCH" in arm64) RID=linux-arm64 ;; *) RID=linux-x64 ;; esac && /usr/share/dotnet/dotnet publish --configuration Release --runtime "$RID" --output /out/lampac -p:Parallel=false Core/Core.csproj
+RUN case "$BUILDARCH" in \
+  arm64) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
+  *) SDK_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" ;; \
+  esac && \
+  curl -fSL -o /tmp/dotnet-sdk.tar.gz "${SDK_URL}" && \
+  mkdir -p /usr/share/dotnet && tar -xzf /tmp/dotnet-sdk.tar.gz -C /usr/share/dotnet && rm /tmp/dotnet-sdk.tar.gz
+RUN case "$TARGETARCH" in \
+  arm64) RID=linux-arm64 ;; \
+  *) RID=linux-x64 ;; \
+  esac && \
+  /usr/share/dotnet/dotnet publish --configuration Release --runtime "$RID" --output /out/lampac -p:Parallel=false Core/Core.csproj
 
 # --- Runner Stage ---
 FROM debian:13-slim AS runner
@@ -20,14 +29,17 @@ ARG DOTNET_SDK_VERSION
 WORKDIR /lampac
 EXPOSE 7860
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates chromium curl fontconfig libicu76 procps nginx tini \
+    ca-certificates chromium curl fontconfig libicu76 procps nginx tini python3 \
     libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
     libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 \
     libpango-1.0-0 libasound2 libglib2.0-0 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
-RUN case "$TARGETARCH" in arm64) RID=arm64 ;; *) RID=x64 ;; esac && \
-    curl -fSL -o /tmp/sdk.tar.gz "https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-${RID}.tar.gz" && \
-    mkdir -p /usr/share/dotnet && tar -xzf /tmp/sdk.tar.gz -C /usr/share/dotnet && rm /tmp/sdk.tar.gz
+RUN case "$TARGETARCH" in \
+  arm64) RID=arm64 ;; \
+  *) RID=x64 ;; \
+  esac && \
+  curl -fSL -o /tmp/sdk.tar.gz "https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-${RID}.tar.gz" && \
+  mkdir -p /usr/share/dotnet && tar -xzf /tmp/sdk.tar.gz -C /usr/share/dotnet && rm /tmp/sdk.tar.gz
 
 ENV PATH="${PATH}:/usr/share/dotnet" \
     DOTNET_RUNNING_IN_CONTAINER=true \
@@ -45,15 +57,13 @@ COPY --from=builder /build/Core/wwwroot /lampac/wwwroot
 RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
     find /lampac/online -name "*.js" -exec cp -f {} /lampac/wwwroot/ \;
 
-RUN echo 'server { listen 7860; location / { proxy_pass http://127.0.0.1:9118; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; } }' > /etc/nginx/sites-available/default
-
-# Конфиг Chromium (таймаут 120с сохранен, ограничения убраны)
+# Конфиг Chromium БЕЗ ключа TMDB (заменен на @TMDB_PLACEHOLDER@)
 RUN echo '{ \
   "listen": {"port": 9118}, \
   "server": {"host": "0.0.0.0", "allow_cors": true}, \
   "cache": {"enable": true, "path": "/tmp/cache"}, \
   "lowMemoryMode": false, \
-  "tmdb": { "enable": true, "proxy": true, "api_key": "4ef0d735117c451680108888591f391d" }, \
+  "tmdb": { "enable": true, "proxy": true, "api_key": "@TMDB_PLACEHOLDER@" }, \
   "LampaWeb": { \
     "init": true, \
     "base_url": "https://lexa020788-lamposhka.hf.space", \
@@ -79,7 +89,7 @@ RUN echo '{ \
   } \
 }' > /lampac/init.conf
 
-# ИСПРАВЛЕНО: Chromium теперь включен ("use_chromium": true) абсолютно для ВСЕХ источников
+# Chromium включен для всех источников
 RUN mkdir -p /lampac/system /lampac/system/config && \
     echo '{ \
       "VideoDB": {"enable": true, "proxy": true, "use_chromium": true}, \
@@ -98,12 +108,82 @@ RUN mkdir -p /lampac/system /lampac/system/config && \
 
 RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
 
-# Скрипт запуска под tini
-RUN echo '#!/bin/bash\n\
-nginx &\n\
-export DOTNET_GCHeapHardLimit=1C2000000\n\
-exec dotnet Core.dll --urls http://127.0.0.1:9118' > /lampac/entrypoint.sh && \
-chmod +x /lampac/entrypoint.sh
+# Генерация HTML-формы авторизации
+RUN mkdir -p /lampac/auth && echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Lampac Auth</title><style>body{background:#141414;color:#fff;font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}div{background:#2b2b2b;padding:40px;border-radius:8px;text-align:center;box-shadow:0 4px 15px rgba(0,0,0,0.5)}input{padding:12px;width:200px;border:none;border-radius:4px;margin-bottom:15px;font-size:16px;background:#444;color:#fff;text-align:center}button{padding:12px 24px;background:#e50914;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:16px;font-weight:bold;width:100%}#err{color:#e50914;margin-top:10px;font-weight:bold;height:20px;}</style></head><body><div><h2>Введите токен доступа</h2><input type="password" id="pwd" placeholder="Токен" required><br><button onclick="validateToken()">Войти</button><div id="err"></div></div><script>function validateToken(){var inputToken=document.getElementById("pwd").value;fetch("/verify_token?token="+encodeURIComponent(inputToken)).then(function(res){if(res.status===200){document.cookie="lampac_access="+inputToken+"; Path=/; Max-Age=31536000; Secure; SameSite=None";window.location.href="/";}else{document.getElementById("err").innerText="Неверный токен!";}});}</script></body></html>' > /lampac/auth/login.html
+
+# ЧИСТЫЙ СТАРТЕР: Ключ TMDB подставляется на лету из переменных окружения
+RUN printf 'import os\n\
+import json\n\
+import subprocess\n\
+import secrets\n\
+\n\
+token = os.environ.get("LAMPAC_TOKEN")\n\
+if not token:\n\
+    token = secrets.token_hex(32)\n\
+\n\
+tmdb_key = os.environ.get("TMDB_API_KEY", "")\n\
+\n\
+with open("/lampac/init.conf", "r") as f:\n\
+    init_content = f.read()\n\
+init_content = init_content.replace("@TMDB_PLACEHOLDER@", tmdb_key)\n\
+with open("/lampac/init.conf", "w") as f:\n\
+    f.write(init_content)\n\
+\n\
+config = {"accsdb": {"enable": True, "requestKey": True, "accounts": {token: "2040-01-01"}}}\n\
+os.makedirs("/lampac/system/config", exist_ok=True)\n\
+with open("/lampac/system/config/accsdb.json", "w") as f:\n\
+    json.dump(config, f, indent=2)\n\
+\n\
+nginx_conf = f"""\n\
+server {{\n\
+    listen 7860;\n\
+\n\
+    location = /verify_token {{\n\
+        default_type text/plain;\n\
+        if ($arg_token = "{token}") {{\n\
+            add_header "Access-Control-Allow-Origin" "*" always;\n\
+            return 200 "OK";\n\
+        }}\n\
+        return 401 "Unauthorized";\n\
+    }}\n\
+\n\
+    location / {{\n\
+        set $access "allow";\n\
+\n\
+        if ($request_uri ~* "^/($|init\\\\.js|msx)") {{\n\
+            set $access "block";\n\
+        }}\n\
+\n\
+        if ($arg_token = "{token}") {{ set $access "allow"; }}\n\
+        if ($arg_account = "{token}") {{ set $access "allow"; }}\n\
+        if ($http_cookie ~* "lampac_access={token}") {{ set $access "allow"; }}\n\
+        if ($remote_addr = "127.0.0.1") {{ set $access "allow"; }}\n\
+\n\
+        if ($access = "allow") {{\n\
+            proxy_pass http://127.0.0.1:9118;\n\
+        }}\n\
+        if ($access = "block") {{\n\
+            root /lampac/auth;\n\
+            rewrite ^(.*)$ /login.html break;\n\
+            add_header "Access-Control-Allow-Origin" "*" always;\n\
+        }}\n\
+\n\
+        proxy_http_version 1.1;\n\
+        proxy_set_header Upgrade $http_upgrade;\n\
+        proxy_set_header Connection "upgrade"; \n\
+        proxy_set_header Host $host;\n\
+        proxy_set_header X-Real-IP $remote_addr;\n\
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\
+    }}\n\
+}}\n\
+"""\n\
+with open("/etc/nginx/sites-available/default", "w") as f:\n\
+    f.write(nginx_conf)\n\
+\n\
+subprocess.Popen(["nginx"])\n\
+os.environ["DOTNET_GCHeapHardLimit"] = "1C2000000"\n\
+os.execv("/usr/share/dotnet/dotnet", ["dotnet", "Core.dll", "--urls", "http://127.0.0.1:9118"])\n\
+' > /lampac/entrypoint.py
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["/lampac/entrypoint.sh"]
+CMD ["python3", "/lampac/entrypoint.py"]
