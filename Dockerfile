@@ -69,23 +69,12 @@ RUN echo '{ \
     "base_url": "https://lexa020788-lamposhka.hf.space", \
     "api_url": "https://lexa020788-lamposhka.hf.space" \
   }, \
-  "chromium": { \
+    "proxy": { \
     "enable": true, \
-    "puppets": true, \
-    "timeout": 180000, \
-    "executablePath": "/usr/bin/chromium", \
-    "max_processes": 0, \
-    "diskCacheSize": 0, \
-    "memoryCacheSize": 0, \
-    "args": [ \
-      "--no-sandbox", \
-      "--disable-setuid-sandbox", \
-      "--headless=new", \
-      "--disable-gpu", \
-      "--disable-dev-shm-usage", \
-      "--no-first-run", \
-      "--no-default-browser-check" \
-    ] \
+    "list": [] \
+  }, \
+  "chromium": { \
+    "enable": false \
   } \
 }' > /lampac/init.conf
 
