@@ -105,16 +105,12 @@ RUN mkdir -p /lampac/system /lampac/system/config && \
     }' > /lampac/system/accs.json && \
     cp /lampac/system/accs.json /lampac/system/config/accs.json
 
-RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
+        RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
 
 # Генерация HTML-формы авторизации
 RUN mkdir -p /lampac/auth && echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Lampac Auth</title><style>body{background:#141414;color:#fff;font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}div{background:#2b2b2b;padding:40px;border-radius:8px;text-align:center;box-shadow:0 4px 15px rgba(0,0,0,0.5)}input{padding:12px;width:200px;border:none;border-radius:4px;margin-bottom:15px;font-size:16px;background:#444;color:#fff;text-align:center}button{padding:12px 24px;background:#e50914;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:16px;font-weight:bold;width:100%}#err{color:#e50914;margin-top:10px;font-weight:bold;height:20px;}</style></head><body><div><h2>Введите токен доступа</h2><input type="password" id="pwd" placeholder="Токен" required><br><button onclick="validateToken()">Войти</button><div id="err"></div></div><script>function validateToken(){var inputToken=document.getElementById("pwd").value;fetch("/verify_token?token="+encodeURIComponent(inputToken)).then(function(res){if(res.status===200){document.cookie="lampac_access="+inputToken+"; Path=/; Max-Age=31536000; Secure; SameSite=None";window.location.href="/";}else{document.getElementById("err").innerText="Неверный токен!";}});}</script></body></html>' > /lampac/auth/login.html
 
-# УМНЫЙ СТАРТЕР: Исправлен запуск dotnet под любую архитектуру процессора Koyeb
-# ФИНАЛЬНЫЙ СТАРТЕР: Исправлена авторизация по токену и запуск бэкенда
-RUN printf 'import os\n\
-
-    # СТАБИЛЬНЫЙ СТАРТЕР (ВОЗВРАТ К ИСХОДНОМУ ВАРИАНТУ С SUBPROCESS)
+# ЧИСТЫЙ СТАРТЕР: Ключ TMDB подставляется на лету из переменных окружения
 RUN printf 'import os\n\
 import json\n\
 import subprocess\n\
@@ -127,19 +123,10 @@ if not token:\n\
 tmdb_key = os.environ.get("TMDB_API_KEY", "")\n\
 \n\
 with open("/lampac/init.conf", "r") as f:\n\
-    conf_data = json.load(f)\n\
-\n\
-conf_data["tmdb"]["api_key"] = tmdb_key\n\
-\n\
-raw_proxies = os.environ.get("PROXY_LIST", "")\n\
-if raw_proxies:\n\
-    proxy_lines = [p.strip() for p in raw_proxies.split(",") if p.strip()]\n\
-    conf_data["proxy"]["list"] = proxy_lines\n\
-else:\n\
-    conf_data["proxy"]["enable"] = False\n\
-\n\
+    init_content = f.read()\n\
+init_content = init_content.replace("@TMDB_PLACEHOLDER@", tmdb_key)\n\
 with open("/lampac/init.conf", "w") as f:\n\
-    json.dump(conf_data, f, indent=2)\n\
+    f.write(init_content)\n\
 \n\
 config = {"accsdb": {"enable": True, "requestKey": True, "accounts": {token: "2040-01-01"}}}\n\
 os.makedirs("/lampac/system/config", exist_ok=True)\n\
@@ -186,16 +173,16 @@ server {{\n\
         proxy_set_header Host $host;\n\
         proxy_set_header X-Real-IP $remote_addr;\n\
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\
-    }}\n}}\n"""\n\
+    }}\n\
+}}\n\
+"""\n\
 with open("/etc/nginx/sites-available/default", "w") as f:\n\
     f.write(nginx_conf)\n\
 \n\
 subprocess.Popen(["nginx"])\n\
 os.environ["DOTNET_GCHeapHardLimit"] = "1C2000000"\n\
-os.chdir("/lampac")\n\
-subprocess.run(["dotnet", "Core.dll", "--urls", "http://127.0.0.1:9118"])\n\
+os.execv("/usr/share/dotnet/dotnet", ["dotnet", "Core.dll", "--urls", "http://127.0.0.1:9118"])\n\
 ' > /lampac/entrypoint.py
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["python3", "/lampac/entrypoint.py"]
-
