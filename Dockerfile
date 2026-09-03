@@ -195,8 +195,13 @@ with open("/etc/nginx/sites-available/default", "w") as f:\n\
 subprocess.Popen(["nginx"])\n\
 os.environ["DOTNET_GCHeapHardLimit"] = "1C2000000"\n\
 os.chdir("/lampac")\n\
-subprocess.run(["dotnet", "Core.dll", "--urls", "http://127.0.0.1:9118"])\n\
+process = subprocess.Popen(["dotnet", "Core.dll", "--urls", "http://127.0.0.1:9118"])\n\
+process.wait()\n\
 ' > /lampac/entrypoint.py
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["python3", "/lampac/entrypoint.py"]
+
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["python3", "/lampac/entrypoint.py"]
