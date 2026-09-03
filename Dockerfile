@@ -106,9 +106,9 @@ RUN mkdir -p /lampac/auth && echo '<!DOCTYPE html><html><head><meta charset="utf
 # ЧИСТЫЙ СТАРТЕР: Ключ TMDB подставляется на лету из переменных окружения
 # ЧИСТЫЙ СТАРТЕР: Оптимизирован под параллельный запуск и экономию памяти
 # ЧИСТЫЙ СТАРТЕР: Оптимизирован под параллельный запуск и экономию памяти
+# ОПТИМИЗИРОВАННЫЙ СТАРТЕР: Чистая генерация файлов без кода запуска серверов
 RUN printf 'import os\n\
 import json\n\
-import subprocess\n\
 import secrets\n\
 \n\
 token = os.environ.get("LAMPAC_TOKEN")\n\
@@ -173,25 +173,31 @@ server {{\n\
 """\n\
 with open("/etc/nginx/sites-available/default", "w") as f:\n\
     f.write(nginx_conf)\n\
-\n\
-try:\n\
-    os.remove("/etc/nginx/sites-enabled/default")\n\
-except:\n\
-    pass\n\
-\n\
-try:\n\
-    os.symlink("/etc/nginx/sites-available/default", "/etc/nginx/sites-enabled/default")\n\
-except:\n\
-    pass\n\
-\n\
-os.environ["DOTNET_GCHeapHardLimit"] = "1C2000000"\n\
-os.environ["DOTNET_GCLargeObjectHeapCompaction"] = "1"\n\
-os.environ["DOTNET_GCWindowMemoryLimit"] = "1C2000000"\n\
-\n\
-# Из Python-кода полностью убран запуск Nginx, запускается только ядро Лампы\n\
-subprocess.run(["/usr/share/dotnet/dotnet", "Core.dll", "--urls", "http://127.0.0.1:9118"])\n\
 ' > /lampac/entrypoint.py
 
+# НАДЕЖНЫЙ СЦЕНАРИЙ ИНИЦИАЛИЗАЦИИ И ОЧЕРЕДНОСТИ ЗАПУСКА ПОТОКОВ
+RUN printf '#!/bin/sh\n\
+# 1. Стираем дефолтные конфиги заглушек Debian\n\
+rm -f /etc/nginx/sites-enabled/default\n\
+\n\
+# 2. Генерируем конфигурационные файлы и токены через Python\n\
+python3 /lampac/entrypoint.py\n\
+\n\
+# 3. Активируем наш кастомный рабочий конфиг Nginx\n\
+ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default\n\
+\n\
+# 4. Запускаем веб-сервер Nginx в фоне\n\
+nginx\n\
+\n\
+# 5. Принудительно разгружаем кэш и оперативную память .NET\n\
+export COMPlus_GCThreadCount=1\n\
+export DOTNET_GCHeapHardLimit=1C2000000\n\
+export DOTNET_GCLargeObjectHeapCompaction=1\n\
+export DOTNET_GCWindowMemoryLimit=1C2000000\n\
+\n\
+# 6. Запускаем ядро Лампы основным процессом контейнера\n\
+exec /usr/share/dotnet/dotnet Core.dll --urls http://127.0.0.1:9118\n\
+' > /lampac/init.sh && chmod +x /lampac/init.sh
+
 ENTRYPOINT ["/usr/bin/tini", "--"]
-# Сначала Python-скрипт подготовит файлы конфигурации, а затем запустится Nginx на порту 7860
-CMD ["sh", "-c", "python3 /lampac/entrypoint.py & sleep 2 && nginx -g 'daemon off;'"]
+CMD ["/lampac/init.sh"]
