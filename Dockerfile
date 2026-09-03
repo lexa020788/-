@@ -92,6 +92,7 @@ RUN echo '{ \
 
 # Chromium включен для всех источников
 # Жесткое отключение компиляции фонового мусора для разгрузки процессора
+# Жесткое отключение компиляции ВСЕГО аниме-мусора для разгрузки процессора и ОЗУ
 RUN mkdir -p /lampac/system /lampac/system/config && \
     echo '{ \
       "unzy": false, \
@@ -106,10 +107,22 @@ RUN mkdir -p /lampac/system /lampac/system/config && \
       "Kinobase": {"enable": true, "proxy": true, "use_chromium": false}, \
       "Collaps": {"enable": true, "proxy": true, "use_chromium": false}, \
       "HDVB": {"enable": true, "proxy": true, "use_chromium": false}, \
-      "Alloha": {"enable": true, "proxy": true, "use_chromium": false} \
+      "Alloha": {"enable": true, "proxy": true, "use_chromium": false}, \
+      "Kodik": {"enable": false}, \
+      "AniLibria": {"enable": false}, \
+      "AnimeGo": {"enable": false}, \
+      "Animevost": {"enable": false}, \
+      "MoonAnime": {"enable": false}, \
+      "AniMedia": {"enable": false}, \
+      "AnimeON": {"enable": false}, \
+      "Animebesst": {"enable": false}, \
+      "AnimeLib": {"enable": false}, \
+      "AniLiberty": {"enable": false}, \
+      "AiLiberty": {"enable": false}, \
+      "Dreamerscast": {"enable": false}, \
+      "Mikai": {"enable": false} \
     }' > /lampac/system/accs.json && \
     cp /lampac/system/accs.json /lampac/system/config/accs.json
-
 
 RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
 
