@@ -105,6 +105,7 @@ RUN mkdir -p /lampac/auth && echo '<!DOCTYPE html><html><head><meta charset="utf
 
 # ЧИСТЫЙ СТАРТЕР: Ключ TMDB подставляется на лету из переменных окружения
 # ЧИСТЫЙ СТАРТЕР: Оптимизирован под параллельный запуск и экономию памяти
+# ЧИСТЫЙ СТАРТЕР: Оптимизирован под параллельный запуск и экономию памяти
 RUN printf 'import os\n\
 import json\n\
 import subprocess\n\
@@ -187,8 +188,10 @@ os.environ["DOTNET_GCHeapHardLimit"] = "1C2000000"\n\
 os.environ["DOTNET_GCLargeObjectHeapCompaction"] = "1"\n\
 os.environ["DOTNET_GCWindowMemoryLimit"] = "1C2000000"\n\
 \n\
+# Из Python-кода полностью убран запуск Nginx, запускается только ядро Лампы\n\
 subprocess.run(["/usr/share/dotnet/dotnet", "Core.dll", "--urls", "http://127.0.0.1:9118"])\n\
 ' > /lampac/entrypoint.py
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["sh", "-c", "nginx && python3 /lampac/entrypoint.py"]
+# Сначала Python-скрипт подготовит файлы конфигурации, а затем запустится Nginx на порту 7860
+CMD ["sh", "-c", "python3 /lampac/entrypoint.py & sleep 2 && nginx -g 'daemon off;'"]
