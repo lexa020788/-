@@ -113,6 +113,9 @@ RUN mkdir -p /lampac/auth && echo '<!DOCTYPE html><html><head><meta charset="utf
 # УМНЫЙ СТАРТЕР: Исправлен запуск dotnet под любую архитектуру процессора Koyeb
 # ФИНАЛЬНЫЙ СТАРТЕР: Исправлена авторизация по токену и запуск бэкенда
 RUN printf 'import os\n\
+
+    # СТАБИЛЬНЫЙ СТАРТЕР (ВОЗВРАТ К ИСХОДНОМУ ВАРИАНТУ С SUBPROCESS)
+RUN printf 'import os\n\
 import json\n\
 import subprocess\n\
 import secrets\n\
@@ -170,7 +173,6 @@ server {{\n\
 \n\
         if ($access = "allow") {{\n\
             proxy_pass http://127.0.0.1:9118;\n\
-            add_header "Access-Control-Allow-Origin" "*" always;\n\
         }}\n\
         if ($access = "block") {{\n\
             root /lampac/auth;\n\
@@ -191,7 +193,7 @@ with open("/etc/nginx/sites-available/default", "w") as f:\n\
 subprocess.Popen(["nginx"])\n\
 os.environ["DOTNET_GCHeapHardLimit"] = "1C2000000"\n\
 os.chdir("/lampac")\n\
-os.execv("/usr/share/dotnet/dotnet", ["/usr/share/dotnet/dotnet", "Core.dll", "--urls", "http://127.0.0.1:9118"])\n\
+subprocess.run(["dotnet", "Core.dll", "--urls", "http://127.0.0.1:9118"])\n\
 ' > /lampac/entrypoint.py
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
