@@ -69,7 +69,7 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
 RUN echo '{ \
   "listen": {"port": 9118}, \
   "server": {"host": "0.0.0.0", "allow_cors": true}, \
-    "cache": {"enable": true, "path": "/tmp/cache", "maxSize": 30, "memoryLimit": 10}, \
+  "cache": {"enable": false}, \
   "lowMemoryMode": true, \
   "tmdb": { "enable": true, "proxy": true, "api_key": "@TMDB_PLACEHOLDER@" }, \
 
