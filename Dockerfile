@@ -30,6 +30,7 @@ WORKDIR /lampac
 EXPOSE 7860
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl fontconfig libicu76 procps nginx tini python3 \
+    libglib2.0-0 libgstreamer1.0-0 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN case "$TARGETARCH" in \
