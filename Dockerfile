@@ -172,8 +172,17 @@ server {{\n\
 with open("/etc/nginx/sites-available/default", "w") as f:\n\
     f.write(nginx_conf)\n\
 \n\
+try:\n\
+    os.remove("/etc/nginx/sites-enabled/default")\n\
+except:\n\
+    pass\n\
+\n\
 subprocess.Popen(["nginx", "-g", "daemon off;"])\n\
+\n\
 os.environ["DOTNET_GCHeapHardLimit"] = "1C2000000"\n\
+os.environ["DOTNET_GCLargeObjectHeapCompaction"] = "1"\n\
+os.environ["DOTNET_GCWindowMemoryLimit"] = "1C2000000"\n\
+\n\
 subprocess.run(["/usr/share/dotnet/dotnet", "Core.dll", "--urls", "http://127.0.0.1:9118"])\n\
 ' > /lampac/entrypoint.py
 
