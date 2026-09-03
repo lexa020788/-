@@ -59,6 +59,7 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
 # Конфиг Chromium БЕЗ ключа TMDB (заменен на @TMDB_PLACEHOLDER@)
 # Конфиг с жестким отключением лишних плагинов для экономии RAM
 # Оптимизированный конфиг: Chromium ОТКЛЮЧЕН + Сжатие SkipModules для RAM
+# Конфиг: Возвращаем TorrServer и клубничку (SISI), но экономим память на аниме и ENG
 RUN echo '{ \
   "listen": {"port": 9118}, \
   "server": {"host": "0.0.0.0", "allow_cors": true}, \
@@ -73,8 +74,8 @@ RUN echo '{ \
   "BaseModule": { \
     "SkipModules": [ \
       "Catalog", "Tracks", "Transcoding", "WebLog", "CacheMedia", "ForkPlayerXML", \
-      "MsxNative", "Potok", "TelegramAuth", "TelegramAuthBot", "GStreamer", "TorrServer", \
-      "DLNA", "JacRed", "NextHUB", "SISI", "Adult", "OnlineAnime", "OnlineENG", "OnlineGEO" \
+      "MsxNative", "Potok", "TelegramAuth", "TelegramAuthBot", "GStreamer", "DLNA", \
+      "OnlineAnime", "OnlineENG", "OnlineGEO" \
     ], \
     "LoadModules": [".*"] \
   }, \
@@ -110,6 +111,7 @@ RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && chmod -R 
 RUN mkdir -p /lampac/auth && echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Lampac Auth</title><style>body{background:#141414;color:#fff;font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}div{background:#2b2b2b;padding:40px;border-radius:8px;text-align:center;box-shadow:0 4px 15px rgba(0,0,0,0.5)}input{padding:12px;width:200px;border:none;border-radius:4px;margin-bottom:15px;font-size:16px;background:#444;color:#fff;text-align:center}button{padding:12px 24px;background:#e50914;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:16px;font-weight:bold;width:100%}#err{color:#e50914;margin-top:10px;font-weight:bold;height:20px;}</style></head><body><div><h2>Введите токен доступа</h2><input type="password" id="pwd" placeholder="Токен" required><br><button onclick="validateToken()">Войти</button><div id="err"></div></div><script>function validateToken(){var inputToken=document.getElementById("pwd").value;fetch("/verify_token?token="+encodeURIComponent(inputToken)).then(function(res){if(res.status===200){document.cookie="lampac_access="+inputToken+"; Path=/; Max-Age=31536000; Secure; SameSite=None";window.location.href="/";}else{document.getElementById("err").innerText="Неверный токен!";}});}</script></body></html>' > /lampac/auth/login.html
 
 # УМНЫЙ СТАРТЕР: Исправлен запуск dotnet под любую архитектуру процессора Koyeb
+# ФИНАЛЬНЫЙ СТАРТЕР: Исправлена авторизация по токену и запуск бэкенда
 RUN printf 'import os\n\
 import json\n\
 import subprocess\n\
@@ -168,6 +170,7 @@ server {{\n\
 \n\
         if ($access = "allow") {{\n\
             proxy_pass http://127.0.0.1:9118;\n\
+            add_header "Access-Control-Allow-Origin" "*" always;\n\
         }}\n\
         if ($access = "block") {{\n\
             root /lampac/auth;\n\
@@ -186,10 +189,11 @@ with open("/etc/nginx/sites-available/default", "w") as f:\n\
     f.write(nginx_conf)\n\
 \n\
 subprocess.Popen(["nginx"])\n\
-os.environ["DOTNET_GCHeapHardLimit"] = "14000000"\n\
+os.environ["DOTNET_GCHeapHardLimit"] = "1C2000000"\n\
 os.chdir("/lampac")\n\
-subprocess.run(["dotnet", "Core.dll", "--urls", "http://127.0.0.1:9118"])\n\
+os.execv("/usr/share/dotnet/dotnet", ["/usr/share/dotnet/dotnet", "Core.dll", "--urls", "http://127.0.0.1:9118"])\n\
 ' > /lampac/entrypoint.py
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["python3", "/lampac/entrypoint.py"]
+
