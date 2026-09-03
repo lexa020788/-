@@ -172,9 +172,9 @@ server {{\n\
 with open("/etc/nginx/sites-available/default", "w") as f:\n\
     f.write(nginx_conf)\n\
 \n\
-subprocess.Popen(["nginx"])\n\
+subprocess.Popen(["nginx", "-g", "daemon off;"])\n\
 os.environ["DOTNET_GCHeapHardLimit"] = "1C2000000"\n\
-os.execv("/usr/share/dotnet/dotnet", ["dotnet", "Core.dll", "--urls", "http://127.0.0.1:9118"])\n\
+subprocess.run(["/usr/share/dotnet/dotnet", "Core.dll", "--urls", "http://127.0.0.1:9118"])\n\
 ' > /lampac/entrypoint.py
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
