@@ -66,8 +66,8 @@ RUN echo '{ \
 
   "LampaWeb": { \
     "init": true, \
-    "base_url": "https://lampashka.koyeb.app", \
-    "api_url": "https://lampashka.koyeb.app" \
+    "base_url": "https://lamposhka.koyeb.app", \
+    "api_url": "https://lamposhka.koyeb.app" \
   }, \
   "chromium": { \
     "enable": false \
