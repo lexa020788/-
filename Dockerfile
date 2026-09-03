@@ -66,8 +66,8 @@ RUN echo '{ \
   "tmdb": { "enable": true, "proxy": true, "api_key": "@TMDB_PLACEHOLDER@" }, \
   "LampaWeb": { \
     "init": true, \
-    "base_url": "https://lexa020788-lamposhka.hf.space", \
-    "api_url": "https://lexa020788-lamposhka.hf.space" \
+    "base_url": "https://lamposhka.koyeb.app", \
+    "api_url": "https://lamposka.koyeb.app" \
   }, \
     "proxy": { \
     "enable": true, \
