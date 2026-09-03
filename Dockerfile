@@ -57,18 +57,27 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
     find /lampac/online -name "*.js" -exec cp -f {} /lampac/wwwroot/ \;
 
 # Конфиг Chromium БЕЗ ключа TMDB (заменен на @TMDB_PLACEHOLDER@)
+# Конфиг с жестким отключением лишних плагинов для экономии RAM
 RUN echo '{ \
   "listen": {"port": 9118}, \
   "server": {"host": "0.0.0.0", "allow_cors": true}, \
   "cache": {"enable": true, "path": "/tmp/cache"}, \
-  "lowMemoryMode": false, \
+  "lowMemoryMode": true, \
   "tmdb": { "enable": true, "proxy": true, "api_key": "@TMDB_PLACEHOLDER@" }, \
   "LampaWeb": { \
     "init": true, \
-    "base_url": "https://lamposhka.koyeb.app", \
-    "api_url": "https://lamposhka.koyeb.app" \
+    "base_url": "", \
+    "api_url": "" \
   }, \
-    "proxy": { \
+  "BaseModule": { \
+    "SkipModules": [ \
+      "Catalog", "Tracks", "Transcoding", "WebLog", "CacheMedia", "ForkPlayerXML", \
+      "MsxNative", "Potok", "TelegramAuth", "TelegramAuthBot", "GStreamer", "TorrServer", \
+      "DLNA", "JacRed", "NextHUB", "SISI", "Adult", "OnlineAnime", "OnlineENG", "OnlineGEO" \
+    ], \
+    "LoadModules": [".*"] \
+  }, \
+  "proxy": { \
     "enable": true, \
     "list": [] \
   }, \
@@ -76,6 +85,7 @@ RUN echo '{ \
     "enable": false \
   } \
 }' > /lampac/init.conf
+
 
 # Chromium включен для всех источников
 RUN mkdir -p /lampac/system /lampac/system/config && \
