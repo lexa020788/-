@@ -66,7 +66,7 @@ RUN echo '{ \
   "LampaWeb": { \
     "init": true, \
     "base_url": "https://lamposhka.koyeb.app", \
-    "api_url": "https://lamposka.koyeb.app" \
+    "api_url": "https://lamposhka.koyeb.app" \
   }, \
     "proxy": { \
     "enable": true, \
@@ -80,17 +80,17 @@ RUN echo '{ \
 # Chromium включен для всех источников
 RUN mkdir -p /lampac/system /lampac/system/config && \
     echo '{ \
-      "VideoDB": {"enable": true, "proxy": true, "use_chromium": true}, \
-      "VDB": {"enable": true, "proxy": true, "use_chromium": true}, \
-      "vdb": {"enable": true, "proxy": true, "use_chromium": true}, \
-      "PizdatoeHD": {"enable": true, "proxy": true, "use_chromium": true}, \
-      "pizdatoehd": {"enable": true, "proxy": true, "use_chromium": true}, \
-      "Rezka": {"enable": true, "proxy": true, "use_chromium": true}, \
-      "Kinogo": {"enable": true, "proxy": true, "use_chromium": true}, \
-      "Kinobase": {"enable": true, "proxy": true, "use_chromium": true}, \
-      "Collaps": {"enable": true, "proxy": true, "use_chromium": true}, \
-      "HDVB": {"enable": true, "proxy": true, "use_chromium": true}, \
-      "Alloha": {"enable": true, "proxy": true, "use_chromium": true} \
+      "VideoDB": {"enable": true, "proxy": true, "use_chromium": false}, \
+      "VDB": {"enable": true, "proxy": true, "use_chromium": false}, \
+      "vdb": {"enable": true, "proxy": true, "use_chromium": false}, \
+      "PizdatoeHD": {"enable": true, "proxy": true, "use_chromium": false}, \
+      "pizdatoehd": {"enable": true, "proxy": true, "use_chromium": false}, \
+      "Rezka": {"enable": true, "proxy": true, "use_chromium": false}, \
+      "Kinogo": {"enable": true, "proxy": true, "use_chromium": false}, \
+      "Kinobase": {"enable": true, "proxy": true, "use_chromium": false}, \
+      "Collaps": {"enable": true, "proxy": true, "use_chromium": false}, \
+      "HDVB": {"enable": true, "proxy": true, "use_chromium": false}, \
+      "Alloha": {"enable": true, "proxy": true, "use_chromium": false} \
     }' > /lampac/system/accs.json && \
     cp /lampac/system/accs.json /lampac/system/config/accs.json
 
