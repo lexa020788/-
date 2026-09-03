@@ -58,6 +58,7 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
 
 # Конфиг Chromium БЕЗ ключа TMDB (заменен на @TMDB_PLACEHOLDER@)
 # Конфиг с жестким отключением лишних плагинов для экономии RAM
+# Оптимизированный конфиг: Chromium ОТКЛЮЧЕН + Сжатие SkipModules для RAM
 RUN echo '{ \
   "listen": {"port": 9118}, \
   "server": {"host": "0.0.0.0", "allow_cors": true}, \
@@ -85,7 +86,6 @@ RUN echo '{ \
     "enable": false \
   } \
 }' > /lampac/init.conf
-
 
 # Chromium включен для всех источников
 RUN mkdir -p /lampac/system /lampac/system/config && \
