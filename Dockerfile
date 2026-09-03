@@ -29,10 +29,12 @@ ARG DOTNET_SDK_VERSION
 WORKDIR /lampac
 EXPOSE 7860
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl fontconfig libicu76 procps nginx tini python3 \
+    ca-certificates chromium curl fontconfig libicu76 procps nginx tini python3 \
+    libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+    libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 \
+    libpango-1.0-0 libasound2 libglib2.0-0 \
     libgstreamer1.0-0 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
-
 RUN case "$TARGETARCH" in \
   arm64) RID=arm64 ;; \
   *) RID=x64 ;; \
@@ -57,36 +59,25 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
     find /lampac/online -name "*.js" -exec cp -f {} /lampac/wwwroot/ \;
 
 # Конфиг Chromium БЕЗ ключа TMDB (заменен на @TMDB_PLACEHOLDER@)
-# Конфиг с жестким отключением лишних плагинов для экономии RAM
-# Оптимизированный конфиг: Chromium ОТКЛЮЧЕН + Сжатие SkipModules для RAM
-# Конфиг: Возвращаем TorrServer и клубничку (SISI), но экономим память на аниме и ENG
-RUN echo '{ \
-# Конфиг: Без встроенного Chromium. TorrServer и SISI ВКЛЮЧЕНЫ.
 RUN echo '{ \
   "listen": {"port": 9118}, \
   "server": {"host": "0.0.0.0", "allow_cors": true}, \
   "cache": {"enable": true, "path": "/tmp/cache"}, \
-  "lowMemoryMode": true, \
+  "lowMemoryMode": false, \
   "tmdb": { "enable": true, "proxy": true, "api_key": "@TMDB_PLACEHOLDER@" }, \
   "LampaWeb": { \
     "init": true, \
-    "base_url": "", \
-    "api_url": "" \
-  }, \
-  "BaseModule": { \
-    "SkipModules": [ \
-      "Catalog", "Tracks", "Transcoding", "WebLog", "CacheMedia", "ForkPlayerXML", \
-      "MsxNative", "Potok", "TelegramAuth", "TelegramAuthBot", "GStreamer", "DLNA", \
-      "OnlineAnime", "OnlineENG", "OnlineGEO" \
-    ], \
-    "LoadModules": [".*"] \
-  }, \
-  "proxy": { \
-    "enable": true, \
-    "list": [] \
+    "base_url": "https://lampashka.koyeb.app", \
+    "api_url": "https://lampashka.koyeb.app" \
   }, \
   "chromium": { \
     "enable": false \
+  }, \
+  "useproxy": true, \
+  "proxy": { \
+    "list": [ \
+      "'"$PROXY_LIST"'" \
+    ] \
   } \
 }' > /lampac/init.conf
 
@@ -114,7 +105,6 @@ RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && chmod -R 
 RUN mkdir -p /lampac/auth && echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Lampac Auth</title><style>body{background:#141414;color:#fff;font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}div{background:#2b2b2b;padding:40px;border-radius:8px;text-align:center;box-shadow:0 4px 15px rgba(0,0,0,0.5)}input{padding:12px;width:200px;border:none;border-radius:4px;margin-bottom:15px;font-size:16px;background:#444;color:#fff;text-align:center}button{padding:12px 24px;background:#e50914;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:16px;font-weight:bold;width:100%}#err{color:#e50914;margin-top:10px;font-weight:bold;height:20px;}</style></head><body><div><h2>Введите токен доступа</h2><input type="password" id="pwd" placeholder="Токен" required><br><button onclick="validateToken()">Войти</button><div id="err"></div></div><script>function validateToken(){var inputToken=document.getElementById("pwd").value;fetch("/verify_token?token="+encodeURIComponent(inputToken)).then(function(res){if(res.status===200){document.cookie="lampac_access="+inputToken+"; Path=/; Max-Age=31536000; Secure; SameSite=None";window.location.href="/";}else{document.getElementById("err").innerText="Неверный токен!";}});}</script></body></html>' > /lampac/auth/login.html
 
 # ЧИСТЫЙ СТАРТЕР: Ключ TMDB подставляется на лету из переменных окружения
-# ПОЛНОСТЬЮ ИСПРАВЛЕННЫЙ СТАРТЕР С СИНТАКСИСОМ ДЛЯ PROXY_LIST И РАБОЧИМ SUBPROCESS
 RUN printf 'import os\n\
 import json\n\
 import subprocess\n\
@@ -127,19 +117,10 @@ if not token:\n\
 tmdb_key = os.environ.get("TMDB_API_KEY", "")\n\
 \n\
 with open("/lampac/init.conf", "r") as f:\n\
-    conf_data = json.load(f)\n\
-\n\
-conf_data["tmdb"]["api_key"] = tmdb_key\n\
-\n\
-raw_proxies = os.environ.get("PROXY_LIST", "")\n\
-if raw_proxies:\n\
-    proxy_lines = [p.strip() for p in raw_proxies.split(",") if p.strip()]\n\
-    conf_data["proxy"]["list"] = proxy_lines\n\
-else:\n\
-    conf_data["proxy"]["enable"] = False\n\
-\n\
+    init_content = f.read()\n\
+init_content = init_content.replace("@TMDB_PLACEHOLDER@", tmdb_key)\n\
 with open("/lampac/init.conf", "w") as f:\n\
-    json.dump(conf_data, f, indent=2)\n\
+    f.write(init_content)\n\
 \n\
 config = {"accsdb": {"enable": True, "requestKey": True, "accounts": {token: "2040-01-01"}}}\n\
 os.makedirs("/lampac/system/config", exist_ok=True)\n\
@@ -194,14 +175,8 @@ with open("/etc/nginx/sites-available/default", "w") as f:\n\
 \n\
 subprocess.Popen(["nginx"])\n\
 os.environ["DOTNET_GCHeapHardLimit"] = "1C2000000"\n\
-os.chdir("/lampac")\n\
-process = subprocess.Popen(["dotnet", "Core.dll", "--urls", "http://127.0.0.1:9118"])\n\
-process.wait()\n\
+os.execv("/usr/share/dotnet/dotnet", ["dotnet", "Core.dll", "--urls", "http://127.0.0.1:9118"])\n\
 ' > /lampac/entrypoint.py
-
-ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["python3", "/lampac/entrypoint.py"]
-
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["python3", "/lampac/entrypoint.py"]
