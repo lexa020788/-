@@ -53,6 +53,15 @@ COPY --from=builder /build/SISI /lampac/sisi
 COPY --from=builder /build/Modules /lampac/modules
 COPY --from=builder /build/Core/wwwroot /lampac/wwwroot
 
+# ФИЗИЧЕСКОЕ УДАЛЕНИЕ МУСОРНЫХ ПЛАГИНОВ ИЗ СИСТЕМЫ ДЛЯ МАКСИМАЛЬНОЙ РАЗГРУЗКИ
+RUN rm -rf /lampac/online/AsiaGe* /lampac/online/Geosaitebi* /lampac/online/KinoUkr* \
+           /lampac/online/UaKino* /lampac/online/UAFilm* /lampac/online/Ashdi* \
+           /lampac/online/Tortuga* /lampac/online/BamBoo* /lampac/online/Eneyida* \
+           /lampac/online/HdvbUA* /lampac/online/NextHUB* /lampac/online/Zetflix* \
+           /lampac/online/KinoPub* /lampac/online/VoKino* /lampac/online/Filmix* \
+           /lampac/online/Anime* /lampac/online/Ani* /lampac/online/Mikai* \
+           /lampac/online/Kodik* /lampac/online/Dreamerscast* /lampac/online/AiLiberty*
+
 RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
     find /lampac/online -name "*.js" -exec cp -f {} /lampac/wwwroot/ \;
 
@@ -60,7 +69,7 @@ RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
 RUN echo '{ \
   "listen": {"port": 9118}, \
   "server": {"host": "0.0.0.0", "allow_cors": true}, \
-  "cache": {"enable": true, "path": "/tmp/cache"}, \
+    "cache": {"enable": true, "path": "/tmp/cache", "maxSize": 30, "memoryLimit": 10}, \
   "lowMemoryMode": true, \
   "tmdb": { "enable": true, "proxy": true, "api_key": "@TMDB_PLACEHOLDER@" }, \
 
@@ -82,8 +91,11 @@ RUN echo '{ \
 
 
 # Chromium включен для всех источников
+# Жесткое отключение компиляции фонового мусора для разгрузки процессора
 RUN mkdir -p /lampac/system /lampac/system/config && \
     echo '{ \
+      "unzy": false, \
+      "parseHot": false, \
       "VideoDB": {"enable": true, "proxy": true, "use_chromium": false}, \
       "VDB": {"enable": true, "proxy": true, "use_chromium": false}, \
       "vdb": {"enable": true, "proxy": true, "use_chromium": false}, \
@@ -97,6 +109,7 @@ RUN mkdir -p /lampac/system /lampac/system/config && \
       "Alloha": {"enable": true, "proxy": true, "use_chromium": false} \
     }' > /lampac/system/accs.json && \
     cp /lampac/system/accs.json /lampac/system/config/accs.json
+
 
 RUN mkdir -p /lampac/data /lampac/cache /run/nginx /tmp/dotnet_home && chmod -R 777 /lampac /tmp /var/lib/nginx /var/log/nginx /run/nginx
 
