@@ -29,12 +29,9 @@ ARG DOTNET_SDK_VERSION
 WORKDIR /lampac
 EXPOSE 7860
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates chromium curl fontconfig libicu76 procps nginx tini python3 \
-    libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
-    libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 \
-    libpango-1.0-0 libasound2 libglib2.0-0 \
-    libgstreamer1.0-0 \
+    ca-certificates curl fontconfig libicu76 procps nginx tini python3 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 RUN case "$TARGETARCH" in \
   arm64) RID=arm64 ;; \
   *) RID=x64 ;; \
@@ -63,8 +60,9 @@ RUN echo '{ \
   "listen": {"port": 9118}, \
   "server": {"host": "0.0.0.0", "allow_cors": true}, \
   "cache": {"enable": true, "path": "/tmp/cache"}, \
-  "lowMemoryMode": false, \
+  "lowMemoryMode": true, \
   "tmdb": { "enable": true, "proxy": true, "api_key": "@TMDB_PLACEHOLDER@" }, \
+
   "LampaWeb": { \
     "init": true, \
     "base_url": "https://lampashka.koyeb.app", \
