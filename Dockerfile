@@ -81,12 +81,14 @@ RUN echo '{ \
   "chromium": { \
     "enable": false \
   }, \
+  "useproxy": true, \
   "proxy": { \
-    "list": [ $PROXY_LIST ], \
-    "max_connections": 2, \
-    "timeout": 4000 \
+    "list": [ \
+      "'"$PROXY_LIST"'" \
+    ] \
   } \
 }' > /lampac/init.conf
+
 
 # Chromium включен для всех источников
 # Жесткое отключение компиляции фонового мусора для разгрузки процессора
