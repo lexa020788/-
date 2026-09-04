@@ -224,6 +224,14 @@ export DOTNET_GCWindowMemoryLimit=1C2000000\n\
 # 6. Запускаем ядро Лампы основным процессом контейнера\n\
 exec /usr/share/dotnet/dotnet Core.dll --urls http://127.0.0.1:9118\n\
 ' > /lampac/init.sh && chmod +x /lampac/init.sh
+# ДОПОЛНИТЕЛЬНЫЙ БЛОК ДЛЯ СНИЖЕНИЯ НАГРУЗКИ НА CPU И ОЗУ
+RUN echo '{ \
+  "configProperties": { \
+    "System.GC.Server": false, \
+    "System.GC.Concurrent": false, \
+    "System.GC.RetainVM": false \
+  } \
+}' > /lampac/Core.runtimeconfig.template.json
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/lampac/init.sh"]
