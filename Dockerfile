@@ -83,9 +83,12 @@ RUN echo '{ \
   }, \
   "useproxy": true, \
   "proxy": { \
-    "list": [ \
-      "'"$PROXY_LIST"'" \
-    ] \
+    "list": [ $PROXY_LIST ], \
+    "check": false, \
+    "check_speed": false, \
+    "check_interval": 0, \
+    "timeout": 5000, \
+    "max_connections": 2 \
   } \
 }' > /lampac/init.conf
 
