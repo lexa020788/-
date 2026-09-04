@@ -83,12 +83,9 @@ RUN echo '{ \
   }, \
   "useproxy": true, \
   "proxy": { \
-    "list": [ $PROXY_LIST ], \
-    "check": false, \
-    "check_speed": false, \
-    "check_interval": 0, \
-    "timeout": 5000, \
-    "max_connections": 2 \
+    "list": [ \
+      "'"$PROXY_LIST"'" \
+    ] \
   } \
 }' > /lampac/init.conf
 
@@ -227,14 +224,6 @@ export DOTNET_GCWindowMemoryLimit=1C2000000\n\
 # 6. Запускаем ядро Лампы основным процессом контейнера\n\
 exec /usr/share/dotnet/dotnet Core.dll --urls http://127.0.0.1:9118\n\
 ' > /lampac/init.sh && chmod +x /lampac/init.sh
-# ДОПОЛНИТЕЛЬНЫЙ БЛОК ДЛЯ СНИЖЕНИЯ НАГРУЗКИ НА CPU И ОЗУ
-RUN echo '{ \
-  "configProperties": { \
-    "System.GC.Server": false, \
-    "System.GC.Concurrent": false, \
-    "System.GC.RetainVM": false \
-  } \
-}' > /lampac/Core.runtimeconfig.template.json
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/lampac/init.sh"]
