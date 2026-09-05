@@ -114,6 +114,77 @@ RUN echo '{ \
     "list": [ \
       "'"$PROXY_LIST"'" \
     ] \
+RUN case "$TARGETARCH" in \
+  arm64) RID=linux-arm64 ;; \
+  *) RID=linux-x64 ;; \
+  esac && \
+  /usr/share/dotnet/dotnet publish --configuration Release \
+  --runtime "$RID" \
+  --self-contained true \
+  -p:PublishReadyToRun=true \
+  -p:OutputType=Exe \
+  -p:Parallel=false \
+  --output /out/lampac Core/Core.csproj
+
+# --- Runner Stage ---
+# ИСПРАВЛЕНО: Удалена дублировавшаяся строка FROM debian
+FROM debian:13-slim AS runner
+ARG TARGETARCH
+ARG DOTNET_SDK_VERSION
+WORKDIR /lampac
+EXPOSE 7860
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl fontconfig libicu76 procps nginx tini python3 \
+    libglib2.0-0t64 libgstreamer1.0-0 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ИСПРАВЛЕНО: Значение DOTNET_GCHeapHardLimit переведено из ошибочного буквенного в байты (450 МБ)
+ENV PATH="${PATH}:/usr/share/dotnet" \
+    DOTNET_RUNNING_IN_CONTAINER=true \
+    ASPNETCORE_URLS=http://127.0.0.1:9118 \
+    DOTNET_GCHeapHardLimit=471859200 \
+    DOTNET_CLI_HOME=/tmp/dotnet_home
+
+COPY --from=builder /out/lampac /lampac
+COPY --from=builder /build/Shared /lampac/shared
+COPY --from=builder /build/Online /lampac/online
+COPY --from=builder /build/SISI /lampac/sisi
+COPY --from=builder /build/Modules /lampac/modules
+COPY --from=builder /build/Core/wwwroot /lampac/wwwroot
+RUN chmod +x /lampac/Core
+
+# ФИЗИЧЕСКОЕ УДАЛЕНИЕ МУСОРНЫХ ПЛАГИНОВ ИЗ СИСТЕМЫ ДЛЯ МАКСИМАЛЬНОЙ РАЗГРУЗКИ
+RUN rm -rf /lampac/online/AsiaGe* /lampac/online/Geosaitebi* /lampac/online/KinoUkr* \
+           /lampac/online/UaKino* /lampac/online/UAFilm* /lampac/online/Ashdi* \
+           /lampac/online/Tortuga* /lampac/online/BamBoo* /lampac/online/Eneyida* \
+           /lampac/online/HdvbUA* /lampac/online/NextHUB* /lampac/online/Zetflix* \
+           /lampac/online/KinoPub* /lampac/online/VoKino* /lampac/online/Filmix* \
+           /lampac/online/Anime* /lampac/online/Ani* /lampac/online/Mikai* \
+           /lampac/online/Kodik* /lampac/online/Dreamerscast* /lampac/online/AiLiberty*
+
+RUN find /lampac/modules -name "*.js" -exec cp -f {} /lampac/wwwroot/ \; && \
+    find /lampac/online -name "*.js" -exec cp -f {} /lampac/wwwroot/ \;
+
+# Конфиг Chromium БЕЗ ключа TMDB (заменен на @TMDB_PLACEHOLDER@)
+RUN echo '{ \
+  "listen": {"port": 9118}, \
+  "server": {"host": "0.0.0.0", "allow_cors": true}, \
+    "cache": {"enable": true, "path": "/tmp/cache", "maxSize": 30, "memoryLimit": 10}, \
+  "lowMemoryMode": true, \
+  "tmdb": { "enable": true, "proxy": true, "api_key": "@TMDB_PLACEHOLDER@" }, \
+  "LampaWeb": { \
+    "init": true, \
+    "base_url": "https://lamposhka.koyeb.app", \
+    "api_url": "https://lamposhka.koyeb.app" \
+  }, \
+  "chromium": { \
+    "enable": false \
+  }, \
+  "useproxy": true, \
+  "proxy": { \
+    "list": [ \
+      "'"$PROXY_LIST"'" \
+    ] \
   } \
 }' > /lampac/init.conf
 
