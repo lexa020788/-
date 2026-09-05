@@ -41,10 +41,9 @@ RUN case "$TARGETARCH" in \
   mkdir -p /usr/share/dotnet && tar -xzf /tmp/sdk.tar.gz -C /usr/share/dotnet && rm /tmp/sdk.tar.gz
 
 ENV PATH="${PATH}:/usr/share/dotnet" \
-    DOTNET_ROOT="/usr/share/dotnet" \
     DOTNET_RUNNING_IN_CONTAINER=true \
     ASPNETCORE_URLS=http://127.0.0.1:9118 \
-    DOTNET_GCHeapHardLimit=471859200 \
+    DOTNET_GCHeapHardLimit=1C2000000 \
     DOTNET_CLI_HOME=/tmp/dotnet_home
 
 COPY --from=builder /out/lampac /lampac
