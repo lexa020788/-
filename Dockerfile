@@ -20,10 +20,16 @@ RUN case "$TARGETARCH" in \
   arm64) RID=linux-arm64 ;; \
   *) RID=linux-x64 ;; \
   esac && \
-  /usr/share/dotnet/dotnet publish --configuration Release --runtime "$RID" --output /out/lampac -p:Parallel=false Core/Core.csproj
+  /usr/share/dotnet/dotnet publish --configuration Release \
+  --runtime "$RID" \
+  --self-contained true \
+  -p:PublishReadyToRun=true \
+  -p:OutputType=Exe \
+  -p:Parallel=false \
+  --output /out/lampac Core/Core.csproj
 
 # --- Runner Stage ---
-FROM debian:13-slim AS runner
+
 FROM debian:13-slim AS runner
 ARG TARGETARCH
 ARG DOTNET_SDK_VERSION
