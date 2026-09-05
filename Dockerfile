@@ -34,11 +34,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN case "$TARGETARCH" in \
-  arm64) RID=arm64 ;; \
-  *) RID=x64 ;; \
+  arm64) RID=linux-arm64 ;; \
+  *) RID=linux-x64 ;; \
   esac && \
-  curl -fSL -o /tmp/sdk.tar.gz "https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-${RID}.tar.gz" && \
-  mkdir -p /usr/share/dotnet && tar -xzf /tmp/sdk.tar.gz -C /usr/share/dotnet && rm /tmp/sdk.tar.gz
+  /usr/share/dotnet/dotnet publish --configuration Release \
+  --runtime "$RID" \
+  --self-contained true \
+  -p:PublishReadyToRun=true \
+  -p:OutputType=Exe \
+  -p:Parallel=false \
+  --output /out/lampac Core/Core.csproj
 
 ENV PATH="${PATH}:/usr/share/dotnet" \
     DOTNET_RUNNING_IN_CONTAINER=true \
@@ -52,6 +57,7 @@ COPY --from=builder /build/Online /lampac/online
 COPY --from=builder /build/SISI /lampac/sisi
 COPY --from=builder /build/Modules /lampac/modules
 COPY --from=builder /build/Core/wwwroot /lampac/wwwroot
+RUN chmod +x /lampac/Core
 
 # ФИЗИЧЕСКОЕ УДАЛЕНИЕ МУСОРНЫХ ПЛАГИНОВ ИЗ СИСТЕМЫ ДЛЯ МАКСИМАЛЬНОЙ РАЗГРУЗКИ
 RUN rm -rf /lampac/online/AsiaGe* /lampac/online/Geosaitebi* /lampac/online/KinoUkr* \
@@ -220,9 +226,12 @@ export COMPlus_GCThreadCount=1\n\
 export DOTNET_GCHeapHardLimit=1C2000000\n\
 export DOTNET_GCLargeObjectHeapCompaction=1\n\
 export DOTNET_GCWindowMemoryLimit=1C2000000\n\
+# Дополнительные флаги для жесткой экономии RAM на бесплатном Koyeb\n\
+export DOTNET_GCHeapHardLimitPercent=60\n\
+export DOTNET_GCHighMemVolumeThreshold=60\n\
 \n\
-# 6. Запускаем ядро Лампы основным процессом контейнера\n\
-exec /usr/share/dotnet/dotnet Core.dll --urls http://127.0.0.1:9118\n\
+# 6. Запускаем скомпилированное ядро Лампы напрямую (БЕЗ dotnet Core.dll)\n\
+exec /lampac/Core --urls http://127.0.0.1:9118\n\
 ' > /lampac/init.sh && chmod +x /lampac/init.sh
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
