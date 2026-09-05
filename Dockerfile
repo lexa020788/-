@@ -55,6 +55,7 @@ RUN case "$TARGETARCH" in \
   -p:Parallel=false \
   --output /out/lampac Core/Core.csproj
 
+
 # --- Runner Stage ---
 # ИСПРАВЛЕНО: Удалена дублировавшаяся строка FROM debian
 FROM debian:13-slim AS runner
@@ -73,6 +74,7 @@ ENV PATH="${PATH}:/usr/share/dotnet" \
     ASPNETCORE_URLS=http://127.0.0.1:9118 \
     DOTNET_GCHeapHardLimit=471859200 \
     DOTNET_CLI_HOME=/tmp/dotnet_home
+
 
 COPY --from=builder /out/lampac /lampac
 COPY --from=builder /build/Shared /lampac/shared
