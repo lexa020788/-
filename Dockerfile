@@ -207,30 +207,17 @@ with open("/etc/nginx/sites-available/default", "w") as f:\n\
     f.write(nginx_conf)\n\
 ' > /lampac/entrypoint.py
 
-# НАДЕЖНЫЙ СЦЕНАРИЙ ИНИЦИАЛИЗАЦИИ И ОЧЕРЕДНОСТИ ЗАПУСКА ПОТОКОВ
 RUN printf '#!/bin/sh\n\
-# 1. Стираем дефолтные конфиги заглушек Debian\n\
 rm -f /etc/nginx/sites-enabled/default\n\
-\n\
-# 2. Генерируем конфигурационные файлы и токены через Python\n\
 python3 /lampac/entrypoint.py\n\
-\n\
-# 3. Активируем наш кастомный рабочий конфиг Nginx\n\
 ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default\n\
-\n\
-# 4. Запускаем веб-сервер Nginx в фоне\n\
 nginx\n\
-\n\
-# 5. Принудительно разгружаем кэш и оперативную память .NET\n\
 export COMPlus_GCThreadCount=1\n\
 export DOTNET_GCHeapHardLimit=1C2000000\n\
 export DOTNET_GCLargeObjectHeapCompaction=1\n\
 export DOTNET_GCWindowMemoryLimit=1C2000000\n\
-# Дополнительные флаги для жесткой экономии RAM на бесплатном Koyeb\n\
 export DOTNET_GCHeapHardLimitPercent=60\n\
 export DOTNET_GCHighMemVolumeThreshold=60\n\
-\n\
-# 6. Запускаем скомпилированное ядро Лампы напрямую (БЕЗ dotnet Core.dll)\n\
 exec /lampac/Core --urls http://127.0.0.1:9118\n\
 ' > /lampac/init.sh && chmod +x /lampac/init.sh
 
