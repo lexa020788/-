@@ -179,8 +179,7 @@ server {{\n\
 \n\
         if ($arg_token = "{token}") {{ set $access "allow"; }}\n\
         if ($arg_account = "{token}") {{ set $access "allow"; }}\n\
-        if ($http_cookie ~* "lampac_access={token}") {{ set $access "allow"; }}\n\
-        if ($remote_addr = "127.0.0.1") {{ set $access "allow"; }}\n\
+        if ($http_cookie ~* "lampac_access={token}") {{ set $access "allow"; }}\n\    
 \n\
         if ($access = "allow") {{\n\
             proxy_pass http://127.0.0.1:9118;\n\
