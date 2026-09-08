@@ -24,6 +24,7 @@ RUN case "$TARGETARCH" in \
 
 # --- Runner Stage ---
 FROM debian:13-slim AS runner
+FROM debian:13-slim AS runner
 ARG TARGETARCH
 ARG DOTNET_SDK_VERSION
 WORKDIR /lampac
@@ -33,20 +34,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0t64 libgstreamer1.0-0 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN case "$TARGETARCH" in \
-  arm64) RID=arm64 ;; \
-  *) RID=x64 ;; \
-  esac && \
-  curl -fSL -o /tmp/sdk.tar.gz "https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-${RID}.tar.gz" && \
-  mkdir -p /usr/share/dotnet && tar -xzf /tmp/sdk.tar.gz -C /usr/share/dotnet && rm /tmp/sdk.tar.gz
-
 ENV PATH="${PATH}:/usr/share/dotnet" \
-    DOTNET_ROOT="/usr/share/dotnet" \
     DOTNET_RUNNING_IN_CONTAINER=true \
     ASPNETCORE_URLS=http://127.0.0.1:9118 \
-    DOTNET_GCHeapHardLimit=471859200 \
+    DOTNET_GCHeapHardLimit=1C2000000 \
     DOTNET_CLI_HOME=/tmp/dotnet_home
-
 
 COPY --from=builder /out/lampac /lampac
 COPY --from=builder /build/Shared /lampac/shared
@@ -54,6 +46,7 @@ COPY --from=builder /build/Online /lampac/online
 COPY --from=builder /build/SISI /lampac/sisi
 COPY --from=builder /build/Modules /lampac/modules
 COPY --from=builder /build/Core/wwwroot /lampac/wwwroot
+RUN chmod +x /lampac/Core
 
 # ФИЗИЧЕСКОЕ УДАЛЕНИЕ МУСОРНЫХ ПЛАГИНОВ ИЗ СИСТЕМЫ ДЛЯ МАКСИМАЛЬНОЙ РАЗГРУЗКИ
 RUN rm -rf /lampac/online/AsiaGe* /lampac/online/Geosaitebi* /lampac/online/KinoUkr* \
@@ -75,12 +68,11 @@ RUN echo '{ \
   "lowMemoryMode": true, \
   "tmdb": { "enable": true, "proxy": true, "api_key": "@TMDB_PLACEHOLDER@" }, \
 
-    "LampaWeb": { \
+  "LampaWeb": { \
     "init": true, \
-    "base_url": "", \
-    "api_url": "" \
+    "base_url": "https://lamposhka.koyeb.app", \
+    "api_url": "https://lamposhka.koyeb.app" \
   }, \
-
   "chromium": { \
     "enable": false \
   }, \
@@ -179,7 +171,8 @@ server {{\n\
 \n\
         if ($arg_token = "{token}") {{ set $access "allow"; }}\n\
         if ($arg_account = "{token}") {{ set $access "allow"; }}\n\
-        if ($http_cookie ~* "lampac_access={token}") {{ set $access "allow"; }}\n\    
+        if ($http_cookie ~* "lampac_access={token}") {{ set $access "allow"; }}\n\
+        if ($remote_addr = "127.0.0.1") {{ set $access "allow"; }}\n\
 \n\
         if ($access = "allow") {{\n\
             proxy_pass http://127.0.0.1:9118;\n\
@@ -203,35 +196,18 @@ with open("/etc/nginx/sites-available/default", "w") as f:\n\
     f.write(nginx_conf)\n\
 ' > /lampac/entrypoint.py
 
-# НАДЕЖНЫЙ СЦЕНАРИЙ ИНИЦИАЛИЗАЦИИ И ОЧЕРЕДНОСТИ ЗАПУСКА ПОТОКОВ
 RUN printf '#!/bin/sh\n\
-# 1. Стираем дефолтные конфиги заглушек Debian\n\
 rm -f /etc/nginx/sites-enabled/default\n\
-\n\
-# 2. Генерируем конфигурационные файлы и токены через Python\n\
 python3 /lampac/entrypoint.py\n\
-\n\
-# 3. Активируем наш кастомный рабочий конфиг Nginx\n\
 ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default\n\
-\n\
-# 4. Запускаем веб-сервер Nginx в фоне\n\
 nginx\n\
-\n\
-# 5. Принудительно разгружаем кэш и оперативную память .NET\n\
-# # 5. Принудительно разгружаем кэш и оперативную память
-export DOTNET_GCName=Workstation\n\
-export DOTNET_gcServer=0\n\
-export COMPlus_gcServer=0\n\
 export COMPlus_GCThreadCount=1\n\
-export DOTNET_GCHeapHardLimit=471859200\n\
+export DOTNET_GCHeapHardLimit=1C2000000\n\
 export DOTNET_GCLargeObjectHeapCompaction=1\n\
-export DOTNET_GCWindowMemoryLimit=471859200\n\
+export DOTNET_GCWindowMemoryLimit=1C2000000\n\
 export DOTNET_GCHeapHardLimitPercent=60\n\
 export DOTNET_GCHighMemVolumeThreshold=60\n\
-\n\
-# 6. Запускаем ядро Лампы основным процессом контейнера\n\
-exec /usr/share/dotnet/dotnet Core.dll --urls "http://127.0.0.1:9118" --environment Production
-\n\
+exec /lampac/Core --urls http://127.0.0.1:9118\n\
 ' > /lampac/init.sh && chmod +x /lampac/init.sh
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
