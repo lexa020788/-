@@ -92,33 +92,20 @@ RUN echo '{ \
 # Жесткое отключение компиляции фонового мусора для разгрузки процессора
 # Жесткое отключение компиляции ВСЕГО аниме-мусора для разгрузки процессора и ОЗУ
 RUN mkdir -p /lampac/system /lampac/system/config && \
-    echo '{ \
+        echo '{ \
       "unzy": false, \
       "parseHot": false, \
-      "VideoDB": {"enable": true, "proxy": true, "use_chromium": false}, \
-      "VDB": {"enable": true, "proxy": true, "use_chromium": false}, \
-      "vdb": {"enable": true, "proxy": true, "use_chromium": false}, \
-      "PizdatoeHD": {"enable": true, "proxy": true, "use_chromium": false}, \
-      "pizdatoehd": {"enable": true, "proxy": true, "use_chromium": false}, \
-      "Rezka": {"enable": true, "proxy": true, "use_chromium": false}, \
-      "Kinogo": {"enable": true, "proxy": true, "use_chromium": false}, \
-      "Kinobase": {"enable": true, "proxy": true, "use_chromium": false}, \
-      "Collaps": {"enable": true, "proxy": true, "use_chromium": false}, \
-      "HDVB": {"enable": true, "proxy": true, "use_chromium": false}, \
-      "Alloha": {"enable": true, "proxy": true, "use_chromium": false}, \
-      "Kodik": {"enable": false}, \
-      "AniLibria": {"enable": false}, \
-      "AnimeGo": {"enable": false}, \
-      "Animevost": {"enable": false}, \
-      "MoonAnime": {"enable": false}, \
-      "AniMedia": {"enable": false}, \
-      "AnimeON": {"enable": false}, \
-      "Animebesst": {"enable": false}, \
-      "AnimeLib": {"enable": false}, \
-      "AniLiberty": {"enable": false}, \
-      "AiLiberty": {"enable": false}, \
-      "Dreamerscast": {"enable": false}, \
-      "Mikai": {"enable": false} \
+      "VideoDB": {"enable": true, "proxy": false, "use_chromium": false}, \
+      "VDB": {"enable": true, "proxy": false, "use_chromium": false}, \
+      "vdb": {"enable": true, "proxy": false, "use_chromium": false}, \
+      "PizdatoeHD": {"enable": true, "proxy": false, "use_chromium": false}, \
+      "pizdatoehd": {"enable": true, "proxy": false, "use_chromium": false}, \
+      "Rezka": {"enable": true, "proxy": false, "use_chromium": false}, \
+      "Kinogo": {"enable": true, "proxy": false, "use_chromium": false}, \
+      "Kinobase": {"enable": true, "proxy": false, "use_chromium": false}, \
+      "Collaps": {"enable": true, "proxy": false, "use_chromium": false}, \
+      "HDVB": {"enable": true, "proxy": false, "use_chromium": false}, \
+      "Alloha": {"enable": true, "proxy": false, "use_chromium": false}, \
     }' > /lampac/system/accs.json && \
     cp /lampac/system/accs.json /lampac/system/config/accs.json
 
