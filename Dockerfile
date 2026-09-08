@@ -222,7 +222,8 @@ export DOTNET_GCLargeObjectHeapCompaction=1\n\
 export DOTNET_GCWindowMemoryLimit=1C2000000\n\
 \n\
 # 6. Запускаем ядро Лампы основным процессом контейнера\n\
-exec /usr/share/dotnet/dotnet Core.dll --urls http://127.0.0.1:9118\n\
+exec /usr/share/dotnet/dotnet Core.dll --urls "http://127.0.0.1:9118" --environment Production
+\n\
 ' > /lampac/init.sh && chmod +x /lampac/init.sh
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
