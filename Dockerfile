@@ -73,11 +73,12 @@ RUN echo '{ \
   "lowMemoryMode": true, \
   "tmdb": { "enable": true, "proxy": true, "api_key": "@TMDB_PLACEHOLDER@" }, \
 
-  "LampaWeb": { \
+    "LampaWeb": { \
     "init": true, \
-    "base_url": "https://lampac-latest-rwzu.onrender.com", \
-    "api_url": "https://lampac-latest-rwzu.onrender.com" \
+    "base_url": "", \
+    "api_url": "" \
   }, \
+
   "chromium": { \
     "enable": false \
   }, \
@@ -216,10 +217,16 @@ ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default\n\
 nginx\n\
 \n\
 # 5. Принудительно разгружаем кэш и оперативную память .NET\n\
+# # 5. Принудительно разгружаем кэш и оперативную память
+export DOTNET_GCName=Workstation\n\
+export DOTNET_gcServer=0\n\
+export COMPlus_gcServer=0\n\
 export COMPlus_GCThreadCount=1\n\
-export DOTNET_GCHeapHardLimit=1C2000000\n\
+export DOTNET_GCHeapHardLimit=471859200\n\
 export DOTNET_GCLargeObjectHeapCompaction=1\n\
-export DOTNET_GCWindowMemoryLimit=1C2000000\n\
+export DOTNET_GCWindowMemoryLimit=471859200\n\
+export DOTNET_GCHeapHardLimitPercent=60\n\
+export DOTNET_GCHighMemVolumeThreshold=60\n\
 \n\
 # 6. Запускаем ядро Лампы основным процессом контейнера\n\
 exec /usr/share/dotnet/dotnet Core.dll --urls "http://127.0.0.1:9118" --environment Production
