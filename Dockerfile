@@ -75,8 +75,8 @@ RUN echo '{ \
 
   "LampaWeb": { \
     "init": true, \
-    "base_url": "https://lamposhka.koyeb.app", \
-    "api_url": "https://lamposhka.koyeb.app" \
+    "base_url": "https://lampac-latest-rwzu.onrender.com", \
+    "api_url": "https://lampac-latest-rwzu.onrender.com" \
   }, \
   "chromium": { \
     "enable": false \
