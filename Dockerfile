@@ -78,14 +78,12 @@ RUN echo '{ \
     "base_url": "https://lamposhka.koyeb.app", \
     "api_url": "https://lamposhka.koyeb.app" \
   }, \
-  "chromium": { \
+    "chromium": { \
     "enable": false \
   }, \
-  "useproxy": true, \
+  "useproxy": false, \
   "proxy": { \
-    "list": [ \
-      "'"$PROXY_LIST"'" \
-    ] \
+    "list": [] \
   } \
 }' > /lampac/init.conf
 
