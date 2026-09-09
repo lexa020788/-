@@ -25,12 +25,23 @@ RUN case "$TARGETARCH" in \
 # --- Runner Stage ---
 FROM debian:13-slim AS runner
 ARG TARGETARCH
-ARG DOTNET_SDK_VERSION
+ARG DOTNET_VERSION
 WORKDIR /lampac
 EXPOSE 7860
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl fontconfig libicu76 procps nginx tini python3 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Скачиваем и устанавливаем легковесный .NET Runtime вместо тяжелого SDK
+RUN case "$TARGETARCH" in \
+  arm64) RUNTIME_URL="https://microsoft.com{DOTNET_VERSION}/dotnet-runtime-${DOTNET_VERSION}-linux-arm64.tar.gz" ;; \
+  *) RUNTIME_URL="https://microsoft.com{DOTNET_VERSION}/dotnet-runtime-${DOTNET_VERSION}-linux-x64.tar.gz" ;; \
+  esac && \
+  curl -fSL -o /tmp/dotnet-runtime.tar.gz "${RUNTIME_URL}" && \
+  mkdir -p /usr/share/dotnet && \
+  tar -xzf /tmp/dotnet-runtime.tar.gz -C /usr/share/dotnet && \
+  rm /tmp/dotnet-runtime.tar.gz
 
 ENV PATH="${PATH}:/usr/share/dotnet" \
     DOTNET_RUNNING_IN_CONTAINER=true \
@@ -163,17 +174,17 @@ with open("/tmp/nginx.conf", "w") as f:\n\
     f.write(nginx_conf)\n\
 ' > /lampac/entrypoint.py
 
-# АГРЕССИВНЫЕ НАСТРОЙКИ ОЧИСТКИ ОЗУ ДЛЯ СРЕДЫ .NET (Защита от OOM)
+# АГРЕССИВНЫЕ НАСТРОЙКИ ОЧИСТКИ ОЗУ ДЛЯ СРЕДЫ .NET (Оптимизировано под ультра-низкое потребление)
 RUN printf '#!/bin/sh\n\
 python3 /lampac/entrypoint.py\n\
 nginx -c /tmp/nginx.conf -g "daemon on;"\n\
 \n\
 export COMPlus_GCThreadCount=1\n\
-export DOTNET_GCHeapHardLimitPercent=50\n\
-export DOTNET_GCWindowMemoryLimitPercent=50\n\
+export DOTNET_GCHeapHardLimitPercent=40\n\
+export DOTNET_GCWindowMemoryLimitPercent=40\n\
 export DOTNET_GCLargeObjectHeapCompaction=1\n\
-export DOTNET_GCHighMemVolumeThreshold=50\n\
-export DOTNET_GCHeapHardLimit=13000000\n\
+export DOTNET_GCHighMemVolumeThreshold=40\n\
+export DOTNET_GCHeapHardLimit=50331648\n\
 \n\
 exec /lampac/Core --urls http://127.0.0.1:9118\n\
 ' > /lampac/init.sh && chmod +x /lampac/init.sh
