@@ -24,6 +24,7 @@ RUN case "$TARGETARCH" in \
 
 # --- Runner Stage ---
 FROM debian:13-slim AS runner
+FROM debian:13-slim AS runner
 ARG TARGETARCH
 ARG DOTNET_SDK_VERSION
 WORKDIR /lampac
@@ -32,13 +33,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl fontconfig libicu76 procps nginx tini python3 \
     libglib2.0-0t64 libgstreamer1.0-0 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-RUN case "$TARGETARCH" in \
-  arm64) RID=arm64 ;; \
-  *) RID=x64 ;; \
-  esac && \
-  curl -fSL -o /tmp/sdk.tar.gz "https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-${RID}.tar.gz" && \
-  mkdir -p /usr/share/dotnet && tar -xzf /tmp/sdk.tar.gz -C /usr/share/dotnet && rm /tmp/sdk.tar.gz
 
 ENV PATH="${PATH}:/usr/share/dotnet" \
     DOTNET_RUNNING_IN_CONTAINER=true \
@@ -52,6 +46,7 @@ COPY --from=builder /build/Online /lampac/online
 COPY --from=builder /build/SISI /lampac/sisi
 COPY --from=builder /build/Modules /lampac/modules
 COPY --from=builder /build/Core/wwwroot /lampac/wwwroot
+RUN chmod +x /lampac/Core
 
 # ФИЗИЧЕСКОЕ УДАЛЕНИЕ МУСОРНЫХ ПЛАГИНОВ ИЗ СИСТЕМЫ ДЛЯ МАКСИМАЛЬНОЙ РАЗГРУЗКИ
 RUN rm -rf /lampac/online/AsiaGe* /lampac/online/Geosaitebi* /lampac/online/KinoUkr* \
@@ -201,28 +196,18 @@ with open("/etc/nginx/sites-available/default", "w") as f:\n\
     f.write(nginx_conf)\n\
 ' > /lampac/entrypoint.py
 
-# НАДЕЖНЫЙ СЦЕНАРИЙ ИНИЦИАЛИЗАЦИИ И ОЧЕРЕДНОСТИ ЗАПУСКА ПОТОКОВ
 RUN printf '#!/bin/sh\n\
-# 1. Стираем дефолтные конфиги заглушек Debian\n\
 rm -f /etc/nginx/sites-enabled/default\n\
-\n\
-# 2. Генерируем конфигурационные файлы и токены через Python\n\
 python3 /lampac/entrypoint.py\n\
-\n\
-# 3. Активируем наш кастомный рабочий конфиг Nginx\n\
 ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default\n\
-\n\
-# 4. Запускаем веб-сервер Nginx в фоне\n\
 nginx\n\
-\n\
-# 5. Принудительно разгружаем кэш и оперативную память .NET\n\
 export COMPlus_GCThreadCount=1\n\
 export DOTNET_GCHeapHardLimit=1C2000000\n\
 export DOTNET_GCLargeObjectHeapCompaction=1\n\
 export DOTNET_GCWindowMemoryLimit=1C2000000\n\
-\n\
-# 6. Запускаем ядро Лампы основным процессом контейнера\n\
-exec /usr/share/dotnet/dotnet Core.dll --urls http://127.0.0.1:9118\n\
+export DOTNET_GCHeapHardLimitPercent=60\n\
+export DOTNET_GCHighMemVolumeThreshold=60\n\
+exec /lampac/Core --urls http://127.0.0.1:9118\n\
 ' > /lampac/init.sh && chmod +x /lampac/init.sh
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
