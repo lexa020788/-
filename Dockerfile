@@ -35,8 +35,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Скачиваем и устанавливаем легковесный .NET Runtime вместо тяжелого SDK
 RUN case "$TARGETARCH" in \
-  arm64) RUNTIME_URL="https://microsoft.com{DOTNET_VERSION}/dotnet-runtime-${DOTNET_VERSION}-linux-arm64.tar.gz" ;; \
-  *) RUNTIME_URL="https://microsoft.com{DOTNET_VERSION}/dotnet-runtime-${DOTNET_VERSION}-linux-x64.tar.gz" ;; \
+  arm64) RUNTIME_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
+  *) RUNTIME_URL="https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-arm64.tar.gz" ;; \
   esac && \
   curl -fSL -o /tmp/dotnet-runtime.tar.gz "${RUNTIME_URL}" && \
   mkdir -p /usr/share/dotnet && \
