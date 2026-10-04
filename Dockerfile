@@ -5,7 +5,7 @@ FROM python:3.11-slim
 # 2. Устанавливаем нужные библиотеки прямо при сборке
 RUN pip install --no-cache-dir flask requests
 
-# 3. Магия: создаем чистый файл app.py прямо внутри Dockerfile без искажения строк
+# 3. Создаем чистый файл app.py внутри контейнера
 COPY <<EOF /app.py
 from flask import Flask, request, jsonify
 import requests
@@ -25,7 +25,7 @@ def home():
 
 @app.route('/kp')
 def get_streams():
-    # БЛОК БЕЗОПАСНОЕ СЛУШАНИЕ: Проверяем токен от Лампы
+    # БЛОК БЕЗОПАСНОСТИ: Проверяем токен от Лампы
     user_token = request.args.get("token")
     if not user_token or user_token != SERVER_TOKEN:
         return jsonify({"error": "Forbidden: Неверный токен доступа"}), 403
@@ -46,13 +46,13 @@ def get_streams():
         html_content = response.text
         playlist = []
         
-        # Универсальный поиск онлайн-видео (.mp4 или .m3u8 потоков)
-        video_urls = re.findall(r"(https?://[^\s\"\']+\.(?:mp4|m3u8))", html_content)
-        for idx, url in enumerate(set(video_urls)):
+        # Умный поиск онлайн-видео (.mp4 или .m3u8 потоков) без использования кавычек в регулярке
+        video_urls = re.findall(r'https?://[^\s\x22\x27]+\.(?:mp4|m3u8)', html_content)
+        for idx, url in enumerate(set(video_urls)): # set() отсекает дубликаты
             playlist.append({"title": f"🎬 Онлайн поток {idx+1}", "video": url})
         
-        # Универсальный поиск торрентов (magnet-ссылок)
-        magnet_links = re.findall(r"magnet:\?xt=[^\s\"\']+", html_content)
+        # Умный поиск торрентов (magnet-ссылок) без использования кавычек в регулярке
+        magnet_links = re.findall(r'magnet:\?xt=[^\s\x22\x27]+', html_content)
         for idx, magnet in enumerate(set(magnet_links)):
             playlist.append({"title": f"💾 Торрент раздача {idx+1}", "torrent": magnet})
         
@@ -73,5 +73,5 @@ EOF
 # 4. Открываем порт для Koyeb
 EXPOSE 8080
 
-# 5. Чистый запуск БЕЗ квадратных скобок (чтобы Koyeb/Linux не путал синтаксис)
+# 5. Запуск процесса
 CMD python /app.py
