@@ -7,11 +7,11 @@ WORKDIR /app
 # 3. Ставим библиотеки для работы с сетью, обхода Cloudflare и парсинга сайта
 RUN pip install --no-cache-dir flask beautifulsoup4 cloudscraper
 
-# 4. Железобетонный способ записи скрипта без искажения кавычек и переменных
+# 4. Скрипт личного Лампака с добавленной защитой от ошибок CORS
 RUN cat << 'EOF' > main.py
 import os
 import urllib.parse
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, make_response
 import cloudscraper
 from bs4 import BeautifulSoup
 
@@ -51,7 +51,7 @@ def plugin():
                         return current_host + "/search?query=" + encodeURIComponent(query.title);
                     }}
                 }};
-            }});
+            }}});
         }});
         
         var server_ip = "{host_addr}".split(":");
@@ -59,8 +59,8 @@ def plugin():
         localStorage.setItem("torrserver_use", "true");
         
         var plugins_to_load = [
-            "http://cub.red",
-            "http://cub.red",
+            "http://cub.red/plugin/etor",
+            "http://cub.red/plugin/tracks",
             "http://cub.red"
         ];
         plugins_to_load.forEach(function(url) {{
@@ -70,7 +70,11 @@ def plugin():
         }});
     }})();
     """
-    return plugin_bundle, 200, {"Content-Type": "application/javascript"}
+    # Добавляем заголовки CORS, чтобы Lampa не ругалась на ошибку сети
+    response = make_response(plugin_bundle)
+    response.headers["Content-Type"] = "application/javascript"
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    return response
 
 @app.route("/search")
 def search():
@@ -92,10 +96,17 @@ def search():
             # Если плееры спрятаны, выдаем прямую ссылку на поиск этого фильма на сайте
             if not links:
                 links.append({{"title": f"Открыть плеер: {{query}}", "url": search_url, "quality": "Auto"}})
-            return jsonify(links)
+            
+            # Добавляем CORS заголовки и для результатов поиска
+            resp = jsonify(links)
+            resp.headers["Access-Control-Allow-Origin"] = "*"
+            return resp
     except: 
         pass
-    return jsonify([])
+    
+    empty_resp = jsonify([])
+    empty_resp.headers["Access-Control-Allow-Origin"] = "*"
+    return empty_resp
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
@@ -104,5 +115,5 @@ EOF
 # 5. Декларируем внутренний порт контейнера
 EXPOSE 8080
 
-# 6. Запускаем наш личный бэкенд
+# 6. Запускаем личный бэкенд
 CMD ["python", "main.py"]
