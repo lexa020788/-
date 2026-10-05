@@ -1,13 +1,12 @@
-# 1. Используем официальный легкий образ Python
+# 1. Используем легкий базовый образ Python
 FROM python:3.10-slim
 
-# 2. Указываем рабочую папку в контейнере
 WORKDIR /app
 
-# 3. Ставим библиотеки для работы с сетью, обхода Cloudflare и парсинга сайта
+# 2. Устанавливаем библиотеки для парсинга и обхода защит сайта
 RUN pip install --no-cache-dir flask beautifulsoup4 cloudscraper
 
-# 4. Скрипт личного Лампака с добавленной защитой от ошибок CORS
+# 3. Пишем гибкий скрипт, который автоматически слушает порт от Koyeb
 RUN cat << 'EOF' > main.py
 import os
 import urllib.parse
@@ -59,8 +58,8 @@ def plugin():
         localStorage.setItem("torrserver_use", "true");
         
         var plugins_to_load = [
-            "http://cub.red/plugin/etor",
-            "http://cub.red/plugin/tracks",
+            "http://cub.red",
+            "http://cub.red",
             "http://cub.red"
         ];
         plugins_to_load.forEach(function(url) {{
@@ -70,7 +69,6 @@ def plugin():
         }});
     }})();
     """
-    # Добавляем заголовки CORS, чтобы Lampa не ругалась на ошибку сети
     response = make_response(plugin_bundle)
     response.headers["Content-Type"] = "application/javascript"
     response.headers["Access-Control-Allow-Origin"] = "*"
@@ -89,15 +87,12 @@ def search():
             soup = BeautifulSoup(res.text, "html.parser")
             links = []
             
-            # Пробуем вытащить iframe плеера со страницы сайта
             for iframe in soup.find_all("iframe", src=True):
                 links.append({{"title": f"Смотреть онлайн [{{query}}]", "url": iframe["src"], "quality": "Auto"}})
             
-            # Если плееры спрятаны, выдаем прямую ссылку на поиск этого фильма на сайте
             if not links:
                 links.append({{"title": f"Открыть плеер: {{query}}", "url": search_url, "quality": "Auto"}})
             
-            # Добавляем CORS заголовки и для результатов поиска
             resp = jsonify(links)
             resp.headers["Access-Control-Allow-Origin"] = "*"
             return resp
@@ -109,11 +104,11 @@ def search():
     return empty_resp
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    # Профессиональный хак для облака: берем порт, который выдал хостинг, или ставим 8000 по умолчанию
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host="0.0.0.0", port=port)
 EOF
 
-# 5. Декларируем внутренний порт контейнера
-EXPOSE 8080
-
-# 6. Запускаем личный бэкенд
+# Информируем систему, что работаем по гибкому порту
+EXPOSE 8000
 CMD ["python", "main.py"]
