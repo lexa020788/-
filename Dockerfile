@@ -7,7 +7,7 @@ WORKDIR /app
 # 3. Ставим необходимые библиотеки для парсинга сети
 RUN pip install --no-cache-dir flask requests beautifulsoup4
 
-# 4. Зашиваем скрипт, который читает адрес сайта ИЗ ПАМЯТИ КОНТЕЙНЕРА (переменная TARGET_SITE)
+# 4. Зашиваем скрипт, работающий прямо на порту 9118
 RUN echo ' \n\
 import os \n\
 from flask import Flask, request, jsonify \n\
@@ -17,7 +17,7 @@ import urllib.parse \n\
 \n\
 app = Flask(__name__) \n\
 \n\
-# Ссылка берется из настроек Portainer, в коде ее нет \n\
+# Ссылка на твой сайт берется из настроек Env в коуеб \n\
 TARGET = os.getenv("TARGET_SITE", "") \n\
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"} \n\
 \n\
@@ -50,8 +50,9 @@ def search(): \n\
             soup = BeautifulSoup(res.text, "html.parser") \n\
             links = [] \n\
             \n\
+            # Ищем iframe плеера со страницы выдачи \n\
             for iframe in soup.find_all("iframe", src=True): \n\
-                links.append({"title": f"Смотреть: {query}", "url": iframe["src"], "quality": "Auto"}) \n\
+                links.append({"title": f"Смотреть фильм [{query}]", "url": iframe["src"], "quality": "Auto"}) \n\
             \n\
             if not links: \n\
                 links.append({"title": f"Открыть плеер: {query}", "url": search_url, "quality": "Auto"}) \n\
@@ -60,11 +61,12 @@ def search(): \n\
     return jsonify([]) \n\
 \n\
 if __name__ == "__main__": \n\
-    app.run(host="0.0.0.0", port=8000) \n\
+    # Запускаем внутренний сервер строго на порту 9118 \n\
+    app.run(host="0.0.0.0", port=9118) \n\
 ' > main.py
 
-# 5. Открываем порт контейнера
-EXPOSE 8000
+# 5. Открываем порт контейнера наружу
+EXPOSE 9118
 
 # 6. Команда на запуск сервера
 CMD ["python", "main.py"]
