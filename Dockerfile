@@ -1,34 +1,33 @@
-# 1. Используем легкий образ Python
+# 1. Используем стабильный и легкий образ Python
 FROM python:3.10-slim
 
-# 2. Устанавливаем системный Nginx и библиотеки Python
-RUN apt-get update && apt-get install -y nginx && rm -rf /var/list/apt/lists/*
+# 2. Устанавливаем системный веб-сервер Nginx
+RUN apt-get update && apt-get install -y nginx && rm -rf /var/lib/apt/lists/*
+
+# 3. Ставим необходимые библиотеки для парсинга и обхода защит сайта
 RUN pip install --no-cache-dir flask beautifulsoup4 cloudscraper gunicorn
 
 WORKDIR /app
 
-# 3. Зашиваем конфигурацию Nginx прямо при сборке контейнера
-# Настраиваем его так, чтобы он слушал порт от Koyeb и отдавал файлы
-RUN echo ' \n\
-server { \n\
+# 4. Прописываем конфигурацию Nginx как прямой мост на порту 8080
+RUN echo 'server { \n\
     listen 8080; \n\
     server_name _; \n\
 \n\
-    # Разрешаем CORS, чтобы Lampa не блокировала плагин \n\
-    add_header "Access-Control-Allow-Origin" "*"; \n\
-    add_header "Access-Control-Allow-Methods" "GET, OPTIONS"; \n\
-    add_header "Access-Control-Allow-Headers" "*"; \n\
+    # Разрешаем CORS заголовки, чтобы Lampa не блокировала плагин \n\
+    add_header "Access-Control-Allow-Origin" "*" always; \n\
+    add_header "Access-Control-Allow-Methods" "GET, OPTIONS" always; \n\
+    add_header "Access-Control-Allow-Headers" "*" always; \n\
 \n\
-    # Перенаправляем запросы Лампы на наш внутренний Python-парсер \n\
+    # Прямой мост: Nginx принимает 8080 и передает на 8080 локального парсера \n\
     location / { \n\
-        proxy_pass http://127.0.0.1:5000; \n\
+        proxy_pass http://127.0.0.1:8080; \n\
         proxy_set_header Host $host; \n\
         proxy_set_header X-Real-IP $remote_addr; \n\
     } \n\
-} \n\
-' > /etc/nginx/sites-available/default
+}' > /etc/nginx/sites-available/default
 
-# 4. Пишем код твоего личного Лампака (теперь он скрыт за Nginx на порту 5000)
+# 5. Зашиваем код твоего личного Лампака (он тоже переведен на порт 8080)
 RUN cat << 'EOF' > main.py
 import os
 import urllib.parse
@@ -44,7 +43,7 @@ scraper = cloudscraper.create_scraper(browser={"browser": "chrome", "platform": 
 @app.route("/coweb")
 def coweb_index():
     host_addr = request.host
-    return f"<h1>Личный coWeb запущен!</h1><p>Ссылка для Лампы: http://{host_addr}/online.js</p>", 200
+    return f"<h1>Личный HTTP coWeb запущен!</h1><p>Ссылка для Лампы: http://{host_addr}/online.js</p>", 200
 
 @app.route("/online.js")
 def plugin():
@@ -86,11 +85,12 @@ def search():
     return jsonify([])
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000)
+    # Скрипт теперь тоже слушает строго порт 8080
+    app.run(host="127.0.0.1", port=8080)
 EOF
 
-# 5. Декларируем внешний порт Nginx для Koyeb
+# 6. Декларируем внешний порт наружу для куеба
 EXPOSE 8080
 
-# 6. Запускаем одновременно и веб-сервер Nginx, и твой Python-парсер
-CMD service nginx start && gunicorn --bind 127.0.0.1:5000 main:app
+# 7. Запускаем одновременно Nginx и парсер через Gunicorn строго на 8080
+CMD service nginx start && gunicorn --bind 127.0.0.1:8080 main:app
