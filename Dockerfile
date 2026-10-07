@@ -1,16 +1,19 @@
 # 1. Используем официальный готовый веб-интерфейс Lampa
 FROM ghcr.io/lampa-app/lampa:latest
 
-# 2. Прямо при сборке вживляем автозапуск твоего плагина в index.html
+# 2. Перенастраиваем Nginx внутри докера на бесконфликтный порт 8080
+RUN sed -i 's/listen       80;/listen       8080;/g' /etc/nginx/conf.d/default.conf
+
+# 3. Прямо при сборке вживляем автозапуск твоего плагина в index.html
 RUN sed -i 's|</head>|<script src="/online.js"></script></head>|g' /usr/share/nginx/html/index.html
 
-# 3. Создаем идеальный JavaScript файл автонастройки прямо внутри папки Лампы
+# 4. Создаем идеальный JavaScript файл автонастройки прямо внутри папки Лампы
 RUN echo '(function () {\n\
     "use strict";\n\
     var h = window.location.host;\n\
     var current_host = window.location.protocol + "//" + h;\n\
     \n\
-    // 1. АВТО-РЕГИСТРАЦИЯ ТВОЕГО ПАРСЕРА\n\
+    // 1. АВТО-РЕГИСТРАЦИЯ ТВОЕГО ЛИЧНОГО ПАРСЕРА\n\
     Lampa.Plugins.add("trout_custom", function () {\n\
         if (!Lampa.Extensions.add) return;\n\
         Lampa.Extensions.add("online", function (object) {\n\
@@ -30,7 +33,7 @@ RUN echo '(function () {\n\
     \n\
     // 3. АВТО-НАСТРОЙКА TORRSERVER (Порт 8090)\n\
     var server_ip = h.split(":");\n\
-    localStorage.setItem("torrserver_url", "http://" + server_ip[0] + ":8090");\n\
+    localStorage.setItem("torrserver_url", "http://" + server_ip + ":8090");\n\
     localStorage.setItem("torrserver_use", "true");\n\
     \n\
     // 4. АВТО-ЗАГРУЗКА ПЛАГИНОВ ТОРРЕНТОВ И ЗВУКА\n\
@@ -41,8 +44,8 @@ RUN echo '(function () {\n\
     });\n\
 })();' > /usr/share/nginx/html/online.js
 
-# 4. Декларируем стандартный порт Nginx наружу для Koyeb
-EXPOSE 80
+# 5. Декларируем порт 8080 наружу для Koyeb
+EXPOSE 8080
 
-# 5. Запускаем чистый веб-сервер
+# 6. Запускаем чистый веб-сервер
 CMD ["nginx", "-g", "daemon off;"]
