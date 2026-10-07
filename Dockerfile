@@ -1,33 +1,13 @@
-# 1. Используем стабильный и легкий образ Python
+# 1. Используем официальный стабильный образ Python
 FROM python:3.10-slim
 
-# 2. Устанавливаем системный веб-сервер Nginx
-RUN apt-get update && apt-get install -y nginx && rm -rf /var/lib/apt/lists/*
+# 2. Указываем рабочую папку в контейнере
+WORKDIR /app
 
 # 3. Ставим необходимые библиотеки для парсинга и обхода защит сайта
 RUN pip install --no-cache-dir flask beautifulsoup4 cloudscraper gunicorn
 
-WORKDIR /app
-
-# 4. Прописываем конфигурацию Nginx как прямой мост на порту 8080
-RUN echo 'server { \n\
-    listen 8080; \n\
-    server_name _; \n\
-\n\
-    # Разрешаем CORS заголовки, чтобы Lampa не блокировала плагин \n\
-    add_header "Access-Control-Allow-Origin" "*" always; \n\
-    add_header "Access-Control-Allow-Methods" "GET, OPTIONS" always; \n\
-    add_header "Access-Control-Allow-Headers" "*" always; \n\
-\n\
-    # Прямой мост: Nginx принимает 8080 и передает на 8080 локального парсера \n\
-    location / { \n\
-        proxy_pass http://127.0.0.1:8080; \n\
-        proxy_set_header Host $host; \n\
-        proxy_set_header X-Real-IP $remote_addr; \n\
-    } \n\
-}' > /etc/nginx/sites-available/default
-
-# 5. Зашиваем код твоего личного Лампака (он тоже переведен на порт 8080)
+# 4. Пишем код твоего личного Лампака (работает строго на порту 9118)
 RUN cat << 'EOF' > main.py
 import os
 import urllib.parse
@@ -36,7 +16,11 @@ import cloudscraper
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
+
+# Ссылка на скрытый сайт берется из переменных окружения в куебе
 TARGET = os.getenv("TARGET_SITE", "")
+
+# Создаем умный скрейпер для обхода Cloudflare под видом Windows Chrome
 scraper = cloudscraper.create_scraper(browser={"browser": "chrome", "platform": "windows", "desktop": True})
 
 @app.route("/")
@@ -51,6 +35,7 @@ def plugin():
     plugin_bundle = f"""
     (function () {{
         var current_host = window.location.protocol + "//" + "{host_addr}";
+        
         Lampa.Plugins.add("trout_custom", function () {{
             Lampa.Extensions.add("online", function (object) {{
                 return {{
@@ -60,10 +45,26 @@ def plugin():
                 }};
             }}});
         }});
+        
+        var server_ip = "{host_addr}".split(":");
+        localStorage.setItem("torrserver_url", "http://" + server_ip + ":8090");
+        localStorage.setItem("torrserver_use", "true");
+        
+        var plugins_to_load = [
+            "http://cub.red",
+            "http://cub.red",
+            "http://cub.red"
+        ];
+        plugins_to_load.forEach(function(url) {{
+            var script = document.createElement("script");
+            script.src = url;
+            document.head.appendChild(script);
+        }});
     }})();
     """
     response = make_response(plugin_bundle)
     response.headers["Content-Type"] = "application/javascript"
+    response.headers["Access-Control-Allow-Origin"] = "*"
     return response
 
 @app.route("/search")
@@ -80,17 +81,23 @@ def search():
                 links.append({{"title": f"Смотреть онлайн [{{query}}]", "url": iframe["src"], "quality": "Auto"}})
             if not links:
                 links.append({{"title": f"Открыть плеер: {{query}}", "url": search_url, "quality": "Auto"}})
-            return jsonify(links)
+            
+            resp = jsonify(links)
+            resp.headers["Access-Control-Allow-Origin"] = "*"
+            return resp
     except: pass
-    return jsonify([])
+    
+    empty_resp = jsonify([])
+    empty_resp.headers["Access-Control-Allow-Origin"] = "*"
+    return empty_resp
 
 if __name__ == "__main__":
-    # Скрипт теперь тоже слушает строго порт 8080
-    app.run(host="127.0.0.1", port=8080)
+    # Flask внутри контейнера слушает строго 9118
+    app.run(host="0.0.0.0", port=9118)
 EOF
 
-# 6. Декларируем внешний порт наружу для куеба
-EXPOSE 8080
+# 5. Декларируем порт 9118 наружу для Koyeb
+EXPOSE 9118
 
-# 7. Запускаем одновременно Nginx и парсер через Gunicorn строго на 8080
-CMD service nginx start && gunicorn --bind 127.0.0.1:8080 main:app
+# 6. Запускаем сервер через gunicorn на порту 9118 (основной рабочий процесс)
+CMD ["gunicorn", "--bind", "0.0.0.0:9118", "main:app"]
