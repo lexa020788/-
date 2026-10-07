@@ -7,7 +7,7 @@ WORKDIR /app
 # 3. Устанавливаем библиотеки для парсинга и обхода защит сайта
 RUN pip install --no-cache-dir flask beautifulsoup4 cloudscraper gunicorn
 
-# 4. Пишем код твоего личного Лампака
+# 4. Пишем гибкий код твоего личного Лампака
 RUN cat << 'EOF' > main.py
 import os
 import urllib.parse
@@ -40,10 +40,12 @@ def coweb_index():
 @app.route("/online.js")
 def plugin():
     host_addr = request.host
+    # Полностью очищенный bundle-скрипт без внешних зависающих ссылок
     plugin_bundle = f"""
     (function () {{
         var current_host = window.location.protocol + "//" + "{host_addr}";
         
+        // РЕГИСТРИРУЕМ СТРОГО ТВОЙ ЛИЧНЫЙ ПАРСЕР САЙТА
         Lampa.Plugins.add("trout_custom", function () {{
             Lampa.Extensions.add("online", function (object) {{
                 return {{
@@ -52,21 +54,6 @@ def plugin():
                     }}
                 }};
             }}});
-        }});
-        
-        var server_ip = "{host_addr}".split(":");
-        localStorage.setItem("torrserver_url", "http://" + server_ip + ":8090");
-        localStorage.setItem("torrserver_use", "true");
-        
-        var plugins_to_load = [
-            "http://cub.red",
-            "http://cub.red",
-            "http://cub.red"
-        ];
-        plugins_to_load.forEach(function(url) {{
-            var script = document.createElement("script");
-            script.src = url;
-            document.head.appendChild(script);
         }});
     }})();
     """
@@ -100,12 +87,10 @@ def search():
     return empty_resp
 
 if __name__ == "__main__":
-    # Жестко связываем внутренности с внешним портом 8080 хостинга
-    app.run(host="0.0.0.0", port=8080)
+    # ХАК ДЛЯ ОБЛАКА: Скрипт сам берет тот порт, который выделил Koyeb!
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host="0.0.0.0", port=port)
 EOF
 
-# 5. Декларируем внутренний порт контейнера строго как в куебе
-EXPOSE 8080
-
-# 6. Запускаем сервер через gunicorn на порту 8080
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "main:app"]
+# Запускаем сервер через gunicorn, подстраивая его под системную переменную PORT от Koyeb
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-8000} main:app"]
