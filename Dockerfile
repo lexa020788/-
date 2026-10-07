@@ -7,7 +7,7 @@ WORKDIR /app
 # 3. Ставим необходимые библиотеки для парсинга и работы сервера
 RUN pip install --no-cache-dir flask beautifulsoup4 requests gunicorn
 
-# 4. Железобетонная запись main.py символ в символ через base64, чтобы кавычки никогда не ломались
+# 4. Железобетонная запись main.py символ в символ без искажения кавычек
 RUN cat << 'EOF' > main.py
 import os
 import urllib.parse
@@ -26,23 +26,20 @@ def index():
 def plugin():
     h = request.host
     
-    # Кристально чистый JavaScript-код плагина, полностью соответствующий стандартам API Lampa
+    # Скрипт со встроенной авто-настройкой ВСЕХ меню Лампы (и плагины, и парсер торрентов)
     js = f"""(function () {{
         'use strict';
 
-        // Регистрируем твой плагин с красивым именем
+        var current_host = window.location.protocol + "//" + "{h}";
+        var server_ip = "{h}".split(":")[0];
+
+        // 1. АВТО-РЕГИСТРАЦИЯ ТВОЕГО ЛИЧНОГО ПАРСЕРА ДЛЯ ОНЛАЙН-ВИДЕО
         Lampa.Plugins.add("trout_custom", function () {{
-            
-            // Проверяем, что в Lampa вообще есть расширение "online"
             if (!Lampa.Extensions.add) return;
 
             Lampa.Extensions.add("online", function (object) {{
-                var current_host = window.location.protocol + "//" + "{h}";
-                
                 return {{
-                    // Главная функция поиска, которую вызывает кнопка "Онлайн"
                     search: function (movie_data) {{
-                        // Вытаскиваем точное название фильма (оригинальное или русское)
                         var title = movie_data.movie.title || movie_data.movie.name || '';
                         return current_host + "/search?query=" + encodeURIComponent(title);
                     }}
@@ -50,10 +47,27 @@ def plugin():
             }});
         }});
 
-        // Авто-привязка TorrServer для торрентов на порт 8090
-        var ip = "{h}".split(":");
-        localStorage.setItem("torrserver_url", "http://" + ip[0] + ":8090");
+        // 2. АВТО-ПРОПИСЫВАНИЕ ТВОЕЙ ССЫЛКИ В ПОЛЕ "ПАРСЕР" ДЛЯ ТОРРЕНТОВ
+        localStorage.setItem("parser_use", "true");
+        localStorage.setItem("parser_twyt", "true");
+        localStorage.setItem("parser_url", current_host + "/parser");
+
+        // 3. АВТО-НАСТРОЙКА ДВИЖКА TORRSERVER (Порт 8090)
+        localStorage.setItem("torrserver_url", "http://" + server_ip + ":8090");
         localStorage.setItem("torrserver_use", "true");
+
+        // 4. АВТОМАТИЧЕСКАЯ УСТАНОВКА ВСЕХ НЕОБХОДИМЫХ ДОП. ПЛАГИНОВ CUB
+        var plugins_to_load = [
+            "http://cub.red",
+            "http://cub.red",
+            "http://cub.red"
+        ];
+        
+        plugins_to_load.forEach(function (url) {{
+            var script = document.createElement("script");
+            script.src = url;
+            document.head.appendChild(script);
+        }});
     }})();"""
     
     r = make_response(js)
@@ -66,17 +80,12 @@ def search():
     q = request.args.get("query", "")
     if not q or not TARGET: return jsonify([])
     try:
-        # Твой робот идет на сайт под видом Mozilla 5.0, пряча его домен от Лампы
         res = requests.get(f"{TARGET}/search?query={urllib.parse.quote(q)}", timeout=10, headers={"User-Agent": "Mozilla/5.0"})
         if res.status_code == 200:
             soup = BeautifulSoup(res.text, "html.parser")
             links = []
-            
-            # Вырезаем iframe плеера из движка сайта
             for iframe in soup.find_all("iframe", src=True):
                 links.append({"title": f"Смотреть [{q}]", "url": iframe["src"], "quality": "Auto"})
-                
-            # Если плеер скрыт, даем прямую ссылку на поисковую страницу фильма на сайте
             if not links: 
                 links.append({"title": f"Открыть плеер: {q}", "url": f"{TARGET}/search?query={urllib.parse.quote(q)}", "quality": "Auto"})
             
@@ -85,16 +94,30 @@ def search():
             return resp
     except: pass
     
-    resp = jsonify([])
-    resp.headers["Access-Control-Allow-Origin"] = "*"
-    return resp
+    empty_resp = jsonify([])
+    empty_resp.headers["Access-Control-Allow-Origin"] = "*"
+    return empty_resp
+
+# Эндпоинт для раздач (чтобы Лампа искала торренты через твой докер)
+@app.route("/parser", methods=["GET", "POST"])
+def parser_proxy():
+    q = request.args.get("search", "")
+    # Наш докер перенаправляет запрос на встроенный поисковик раздач JacRed
+    jacred_url = f"http://jacred.xyz{urllib.parse.quote(q)}"
+    try:
+        res = requests.get(jacred_url, timeout=10)
+        resp = make_response(res.text, res.status_code)
+        resp.headers["Content-Type"] = "application/json"
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp
+    except:
+        resp = jsonify([])
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp
 
 if __name__ == "__main__": 
     app.run(host="0.0.0.0", port=9118)
 EOF
 
-# 5. Декларируем порт 9118 наружу для Koyeb
 EXPOSE 9118
-
-# 6. Запускаем сервер через gunicorn на порту 9118
 CMD ["gunicorn", "--bind", "0.0.0.0:9118", "main:app"]
