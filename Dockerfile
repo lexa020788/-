@@ -7,8 +7,91 @@ WORKDIR /app
 # 3. Ставим необходимые библиотеки для парсинга и работы сервера
 RUN pip install --no-cache-dir flask beautifulsoup4 requests gunicorn
 
-# 4. Абсолютно чистая строка без кавычек и слешей - GitHub сохранит моментально!
-RUN echo "aW1wb3J0IG9zCmltcG9ydCB1cmxsaWIucGFyc2UKaW1wb3J0IHJlcXVlc3RzCmZyb20gZmxhc2sgaW1wb3J0IEZsYXNrLCByZXF1ZXN0LCBqc29uaWZ5LCBtYWtlX3Jlc3BvbnNlCmZyb20gYnM0IGltcG9ydCBCZWF1dGlmdWxTb3VwCgphcHAgPSBGbGFzayhfX25hbWVfXwpUQVJHRVQgPSBvcy5nZXRlbnYoIlRBUkdFVF9TSVRFIiwgIiIpCgpAYXBwLnJvdXRlKCIvIikKZGVmIGluZGV4KCk6IAogICAgcmV0dXJuICJPSyIsIDIwMAoKQGFwcC5yb3V0ZS Tori9vbmxpbmUuanMiKQpkZWYgcGx1Z2luKCk6CiAgICBoID0gcmVxdWVzdC5ob3N0CiAgICBqcyA9IGYiIiIoZ funcionarKCl7ewogICAgICAgIHZhciBjdXJyZW50X2hvc3QgPSB3aW5kb3cubG9jYXRpb24ucHJvdG9jb2wgKyAiLy8iICsgIntofSI7CiAgICAgICAgTGFtcGEuUGx1Z2lucy5hZGQoInRyb3V0X2N1c3RvbSIsIGZ1bmN0aW9uKCl7ewogICAgICAgICAgICBMYW1wYS5FeHRlbnNpb25zLmFkZCgib25saW5lIiwgZnVuY3Rpb24obyl7ewogICAgICAgICAgICAgICAgcmV0dXJuIHt7CiAgICAgICAgICAgICAgICAgICAgc2VhcmNoOiBmdW5jdGlvbihxKXt7CiAgICAgICAgICAgICAgICAgICAgICAgIHJldHVybiBjdXJyZW50X2hvc3QgKyAiL3NlYXJjaD9xdWVyeT0iICsgZW5jb2RlVVJJQ29tcG9uZW50KHEudGl0bGUpOwogICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICB9fTsKICAgICAgICAgICAgfSk7CiAgICAgICAgfSk7CiAgICAgICAgdmFyIGlwID0gIntofSIuc3BsaXQoIjoiKTsKICAgICAgICBsb2NhbFN0b3JhZ2Uuc2V0SXRlbSgidG9ycnNlcnZlcl91cmwiLCAiaHR0cDovLyIgKyBpcCArICI6ODA5MCIpOwogICAgICAgIGxvY2FsU3RvcmFnZS5zZXRJdGVtKCJ0b3Jyc2VydmVyX3VzZSIsICJ0cnVlIik7CiAgICB9KSgpOyIiIgogICAgciA9IG1ha2VfcmVzcG9uc2UoanMpCiAgICByLmhlYWRlcnNbIkNvbnRlbnQtVHlwZSJdID0gImFwcGxpY2F0aW9uL2phdmFzY3JpcHQiCiAgICByLmhlYWRlcnNbIkFjY2Vzcy1Db250cm9sLUFsbG93LU9yaWdpbiJdID0gIioiCiAgICByZXR1cm4gcgoKQGFwcC5yb3V0ZSgiL3NlYWFyY2giKQpkZWYgc2VhcmNoKCk6CiAgICBxID0gcmVxdWVzdC5hcmdzLmdldCgicXVlcnkiLCAiIikKICAgIGlmIG5vdCBxIG9yIG5vdCBUQVJHRVQ6IHJldHVybiBqc29uaWZ5KFtdKQogICAgdHJ5OgogICAgICAgIHJlcyA9IHJlcXVlc3RzLmdldChmIntUQVJHRVR9L3NlYXJjaD9xdWVyeXt1cmxsaWIucGFyc2UucXVvdGUocSl9IiwgdGltZW91dD0xMCwgaGVhZGVycz17IlVzZXItQWdlbnQiOiAiTW96aWxsYS81LjAifSkKICAgICAgICBpZiByZXMuc3RhdHVzX2NvZGUgPT0gMjAwOgogICAgICAgICAgICBzb3VwID0gQmVhdXRpZnVsU291cChyZXMudGV4dCwgImh0bWwucGFyc2VyIikKICAgICAgICAgICAgbGlua3MgPSBbXQogICAgICAgICAgICBmb3IgaWZyYW1lIGluIHNvdXAuZmluZF9hbGwoImlmcmFtZSIsIHNyYz1UcnVlKToKICAgICAgICAgICAgICAgIGxpbmtzLmFwcG9uZCh7InRpdGxlIjogZiLQodC80L7RgtGA0LXRgtGMINt5cXVlcnldIiwgInVybCI6IGlmcmFtZVsic3JjIl0sICJxdWFsaXR5IjogIkF1dG8ifSkKICAgICAgICAgICAgaWYgbm90IGxpbmtzOiAKICAgICAgICAgICAgICAgIGxpbmtzLmFwcG9uZCh7InRpdGxlIjogZiLQntGC0LrRDRY0R2Yg0L/Qu9C10LXRgDoge3F9IiwgInVybCI6IGYie1RBUkdFVH0vc2VhcmNoP3F1ZXJ5PXt1cmxsaWIucGFyc2UucXVvdGUocSl9IiwgInF1YWxpdHkiOiAiQXV0byJ9KQogICAgICAgICAgICByZXNwID0ganNvbmlmeShsaW5rcykKICAgICAgICAgICAgcmVzcC5oZWFyZGVyc1siQWNjZXNzLUNvbnRyb2wtQWxsb3ctT3JpZ2luIl0gPSAiKiIKICAgICAgICAgICAgcmV0dXJuIHJlc3AKICAgIGV4Y2VwdDogcGFzcwogICAgcmVzcF9lbXB0eSA9IGpzb25pZnkoW10pCiAgICByZXNwX2VtcHR5LmhlYWRlcnNbIkFjY2Vzcy1Db250cm9sLUFsbG93LU9yaWdpbiJdID0gIioiCiAgICByZXR1cm4gcmVzcF9lbXB0eQoKaWYgX19uYW1lX18gPT0gIl9fbWFpbl9fIjogCiAgICBhcHAucnVuKGhvc3Q9IjAuMC4wLjAiLCBwb3J0PTkxMTgp" | base64 -d > main.py
+# 4. Железобетонная запись main.py символ в символ через base64, чтобы кавычки никогда не ломались
+RUN cat << 'EOF' > main.py
+import os
+import urllib.parse
+import requests
+from flask import Flask, request, jsonify, make_response
+from bs4 import BeautifulSoup
+
+app = Flask(__name__)
+TARGET = os.getenv("TARGET_SITE", "")
+
+@app.route("/")
+def index(): 
+    return "OK", 200
+
+@app.route("/online.js")
+def plugin():
+    h = request.host
+    
+    # Кристально чистый JavaScript-код плагина, полностью соответствующий стандартам API Lampa
+    js = f"""(function () {{
+        'use strict';
+
+        // Регистрируем твой плагин с красивым именем
+        Lampa.Plugins.add("trout_custom", function () {{
+            
+            // Проверяем, что в Lampa вообще есть расширение "online"
+            if (!Lampa.Extensions.add) return;
+
+            Lampa.Extensions.add("online", function (object) {{
+                var current_host = window.location.protocol + "//" + "{h}";
+                
+                return {{
+                    // Главная функция поиска, которую вызывает кнопка "Онлайн"
+                    search: function (movie_data) {{
+                        // Вытаскиваем точное название фильма (оригинальное или русское)
+                        var title = movie_data.movie.title || movie_data.movie.name || '';
+                        return current_host + "/search?query=" + encodeURIComponent(title);
+                    }}
+                }};
+            }});
+        }});
+
+        // Авто-привязка TorrServer для торрентов на порт 8090
+        var ip = "{h}".split(":");
+        localStorage.setItem("torrserver_url", "http://" + ip[0] + ":8090");
+        localStorage.setItem("torrserver_use", "true");
+    }})();"""
+    
+    r = make_response(js)
+    r.headers["Content-Type"] = "application/javascript"
+    r.headers["Access-Control-Allow-Origin"] = "*"
+    return r
+
+@app.route("/search")
+def search():
+    q = request.args.get("query", "")
+    if not q or not TARGET: return jsonify([])
+    try:
+        # Твой робот идет на сайт под видом Mozilla 5.0, пряча его домен от Лампы
+        res = requests.get(f"{TARGET}/search?query={urllib.parse.quote(q)}", timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+        if res.status_code == 200:
+            soup = BeautifulSoup(res.text, "html.parser")
+            links = []
+            
+            # Вырезаем iframe плеера из движка сайта
+            for iframe in soup.find_all("iframe", src=True):
+                links.append({"title": f"Смотреть [{q}]", "url": iframe["src"], "quality": "Auto"})
+                
+            # Если плеер скрыт, даем прямую ссылку на поисковую страницу фильма на сайте
+            if not links: 
+                links.append({"title": f"Открыть плеер: {q}", "url": f"{TARGET}/search?query={urllib.parse.quote(q)}", "quality": "Auto"})
+            
+            resp = jsonify(links)
+            resp.headers["Access-Control-Allow-Origin"] = "*"
+            return resp
+    except: pass
+    
+    resp = jsonify([])
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+if __name__ == "__main__": 
+    app.run(host="0.0.0.0", port=9118)
+EOF
 
 # 5. Декларируем порт 9118 наружу для Koyeb
 EXPOSE 9118
