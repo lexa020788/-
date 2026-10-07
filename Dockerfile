@@ -1,27 +1,26 @@
 # 1. Используем официальный стабильный образ Python
 FROM python:3.10-slim
 
-# 2. Устанавливаем утилиту для скачивания интерфейса Лампы
+# 2. Устанавливаем утилиты для скачивания интерфейса Лампы
 RUN apt-get update && apt-get install -y wget unzip && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# 3. Скачиваем официальный, чистый и независимый веб-интерфейс Lampa прямо в контейнер
+# 3. Скачиваем официальный, чистый веб-интерфейс Lampa прямо в контейнер
 RUN wget https://github.com -O lampa.zip && \
     unzip lampa.zip && \
     mv lampa-main/* . && \
     rm -rf lampa.zip lampa-main
 
-# 4. Ставим необходимые библиотеки Python для твоего личного парсера
+# 4. Ставим необходимые библиотеки Python для работы сети и парсера
 RUN pip install --no-cache-dir flask beautifulsoup4 requests gunicorn
 
-# 5. Пишем код твоего сервера, который будет и Лампу показывать, и парсить скрытый сайт
+# 5. Пишем код твоего сервера, который раздаёт Лампу и выполняет автонастройку
 RUN cat << 'EOF' > main.py
 import os
 import urllib.parse
 import requests
-from flask import Flask, request, jsonify, make_response, send_from_directory
-from bs4 import BeautifulSoup
+from flask import Flask, request, jsonify, make_response
 
 # Указываем Flask раздавать скачанный интерфейс Лампы из текущей папки
 app = Flask(__name__, static_folder='.', static_url_path='')
@@ -30,20 +29,15 @@ TARGET = os.getenv("TARGET_SITE", "")
 # ГЛАВНАЯ СТРАНИЦА: При переходе на lamposhka.koyeb.app открывается ТВОЯ ЛАМПА
 @app.route("/")
 def index():
-    # Читаем оригинальный index.html Лампы
+    # Отдаем оригинальный index.html Лампы
     with open("index.html", "r", encoding="utf-8") as f:
         html = f.read()
     
-    # Автоматическая магия: принудительно вшиваем твой личный online.js прямо в код Лампы при запуске!
-    auto_inject_code = '<script src="/online.js"></script>'
-    if "" in html:
-        html = html.replace("", f"{auto_inject_code}")
-    else:
-        html = html.replace("<head>", f"<head>{auto_inject_code}")
-        
-    return html
+    # Вживляем автозапуск плагина перед закрывающим тегом head
+    auto_inject = '<script src="/online.js"></script></head>'
+    return html.replace("</head>", auto_inject)
 
-# НАШ СКРИПТ АВТО-НАСТРОЙКИ (Лампа запустит его сама без твоего участия)
+# НАШ СКРИПТ АВТО-НАСТРОЙКИ (Лампа запустит его сама при старте страницы)
 @app.route("/online.js")
 def plugin():
     h = request.host
@@ -53,7 +47,7 @@ def plugin():
         var current_host = window.location.protocol + "//" + "{h}";
         var server_ip = "{h}".split(":");
 
-        // 1. АВТО-РЕГИСТРАЦИЯ ТВОЕГО ОНЛАЙН-ПАРСЕРА
+        // 1. АВТО-РЕГИСТРАЦИЯ ТВОЕГО ЛИЧНОГО ПАРСЕРА ДЛЯ ОНЛАЙН-ВИДЕО
         Lampa.Plugins.add("trout_custom", function () {{
             if (!Lampa.Extensions.add) return;
 
@@ -73,7 +67,7 @@ def plugin():
         localStorage.setItem("parser_url", current_host + "/parser");
 
         // 3. АВТО-НАСТРОЙКА ТВОЕГО TORRSERVER (Порт 8090)
-        localStorage.setItem("torrserver_url", "http://" + server_ip[0] + ":8090");
+        localStorage.setItem("torrserver_url", "http://" + server_ip + ":8090");
         localStorage.setItem("torrserver_use", "true");
 
         // 4. АВТО-ЗАГРУЗКА ОСТАЛЬНЫХ СИСТЕМНЫХ ПЛАГИНОВ ДЛЯ ТОРРЕНТОВ И ЗВУКА
