@@ -1,39 +1,59 @@
 # 1. Используем официальный стабильный образ Python
 FROM python:3.10-slim
 
-# 2. Указываем рабочую папку в контейнере
+# 2. Устанавливаем утилиту для скачивания интерфейса Лампы
+RUN apt-get update && apt-get install -y wget unzip && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# 3. Ставим необходимые библиотеки для парсинга и работы сервера
+# 3. Скачиваем официальный, чистый и независимый веб-интерфейс Lampa прямо в контейнер
+RUN wget https://github.com -O lampa.zip && \
+    unzip lampa.zip && \
+    mv lampa-main/* . && \
+    rm -rf lampa.zip lampa-main
+
+# 4. Ставим необходимые библиотеки Python для твоего личного парсера
 RUN pip install --no-cache-dir flask beautifulsoup4 requests gunicorn
 
-# 4. Железобетонная запись main.py символ в символ без искажения кавычек
+# 5. Пишем код твоего сервера, который будет и Лампу показывать, и парсить скрытый сайт
 RUN cat << 'EOF' > main.py
 import os
 import urllib.parse
 import requests
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify, make_response, send_from_directory
 from bs4 import BeautifulSoup
 
-app = Flask(__name__)
+# Указываем Flask раздавать скачанный интерфейс Лампы из текущей папки
+app = Flask(__name__, static_folder='.', static_url_path='')
 TARGET = os.getenv("TARGET_SITE", "")
 
+# ГЛАВНАЯ СТРАНИЦА: При переходе на lamposhka.koyeb.app открывается ТВОЯ ЛАМПА
 @app.route("/")
-def index(): 
-    return "OK", 200
+def index():
+    # Читаем оригинальный index.html Лампы
+    with open("index.html", "r", encoding="utf-8") as f:
+        html = f.read()
+    
+    # Автоматическая магия: принудительно вшиваем твой личный online.js прямо в код Лампы при запуске!
+    auto_inject_code = '<script src="/online.js"></script>'
+    if "" in html:
+        html = html.replace("", f"{auto_inject_code}")
+    else:
+        html = html.replace("<head>", f"<head>{auto_inject_code}")
+        
+    return html
 
+# НАШ СКРИПТ АВТО-НАСТРОЙКИ (Лампа запустит его сама без твоего участия)
 @app.route("/online.js")
 def plugin():
     h = request.host
-    
-    # Скрипт со встроенной авто-настройкой ВСЕХ меню Лампы (и плагины, и парсер торрентов)
     js = f"""(function () {{
         'use strict';
 
         var current_host = window.location.protocol + "//" + "{h}";
-        var server_ip = "{h}".split(":")[0];
+        var server_ip = "{h}".split(":");
 
-        // 1. АВТО-РЕГИСТРАЦИЯ ТВОЕГО ЛИЧНОГО ПАРСЕРА ДЛЯ ОНЛАЙН-ВИДЕО
+        // 1. АВТО-РЕГИСТРАЦИЯ ТВОЕГО ОНЛАЙН-ПАРСЕРА
         Lampa.Plugins.add("trout_custom", function () {{
             if (!Lampa.Extensions.add) return;
 
@@ -47,16 +67,16 @@ def plugin():
             }});
         }});
 
-        // 2. АВТО-ПРОПИСЫВАНИЕ ТВОЕЙ ССЫЛКИ В ПОЛЕ "ПАРСЕР" ДЛЯ ТОРРЕНТОВ
+        // 2. АВТО-ПРОПИСЫВАНИЕ ТОРРЕНТОВ И ПАРСЕРА В ПАМЯТЬ ЛАМПЫ
         localStorage.setItem("parser_use", "true");
         localStorage.setItem("parser_twyt", "true");
         localStorage.setItem("parser_url", current_host + "/parser");
 
-        // 3. АВТО-НАСТРОЙКА ДВИЖКА TORRSERVER (Порт 8090)
-        localStorage.setItem("torrserver_url", "http://" + server_ip + ":8090");
+        // 3. АВТО-НАСТРОЙКА ТВОЕГО TORRSERVER (Порт 8090)
+        localStorage.setItem("torrserver_url", "http://" + server_ip[0] + ":8090");
         localStorage.setItem("torrserver_use", "true");
 
-        // 4. АВТОМАТИЧЕСКАЯ УСТАНОВКА ВСЕХ НЕОБХОДИМЫХ ДОП. ПЛАГИНОВ CUB
+        // 4. АВТО-ЗАГРУЗКА ОСТАЛЬНЫХ СИСТЕМНЫХ ПЛАГИНОВ ДЛЯ ТОРРЕНТОВ И ЗВУКА
         var plugins_to_load = [
             "http://cub.red",
             "http://cub.red",
@@ -75,17 +95,18 @@ def plugin():
     r.headers["Access-Control-Allow-Origin"] = "*"
     return r
 
+# ТВОЙ СКРЫТЫЙ ПАРСЕР ОНЛАЙН-ВИДЕО (Ищет на troutcdn.site под видом Mozilla 5.0)
 @app.route("/search")
 def search():
     q = request.args.get("query", "")
     if not q or not TARGET: return jsonify([])
     try:
-        res = requests.get(f"{TARGET}/search?query={urllib.parse.quote(q)}", timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+        res = requests.get(f"{TARGET}/search?query={urllib.parse.quote(q)}", timeout=10, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
         if res.status_code == 200:
             soup = BeautifulSoup(res.text, "html.parser")
             links = []
             for iframe in soup.find_all("iframe", src=True):
-                links.append({"title": f"Смотреть [{q}]", "url": iframe["src"], "quality": "Auto"})
+                links.append({"title": f"Смотреть онлайн [{q}]", "url": iframe["src"], "quality": "Auto"})
             if not links: 
                 links.append({"title": f"Открыть плеер: {q}", "url": f"{TARGET}/search?query={urllib.parse.quote(q)}", "quality": "Auto"})
             
@@ -98,11 +119,10 @@ def search():
     empty_resp.headers["Access-Control-Allow-Origin"] = "*"
     return empty_resp
 
-# Эндпоинт для раздач (чтобы Лампа искала торренты через твой докер)
+# ТВОЙ СКРЫТЫЙ МОСТ ДЛЯ ТОРРЕНТОВ
 @app.route("/parser", methods=["GET", "POST"])
 def parser_proxy():
     q = request.args.get("search", "")
-    # Наш докер перенаправляет запрос на встроенный поисковик раздач JacRed
     jacred_url = f"http://jacred.xyz{urllib.parse.quote(q)}"
     try:
         res = requests.get(jacred_url, timeout=10)
@@ -119,5 +139,8 @@ if __name__ == "__main__":
     app.run(host="0.0.0.0", port=9118)
 EOF
 
+# 5. Декларируем порт 9118 наружу для Koyeb
 EXPOSE 9118
+
+# 6. Запускаем твою личную полноценную Lampa на порту 9118
 CMD ["gunicorn", "--bind", "0.0.0.0:9118", "main:app"]
