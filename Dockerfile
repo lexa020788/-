@@ -1,13 +1,34 @@
-# 1. Используем официальный стабильный образ Python
+# 1. Используем легкий образ Python
 FROM python:3.10-slim
 
-# 2. Указываем рабочую папку
-WORKDIR /app
-
-# 3. Устанавливаем библиотеки для парсинга и обхода защит сайта
+# 2. Устанавливаем системный Nginx и библиотеки Python
+RUN apt-get update && apt-get install -y nginx && rm -rf /var/list/apt/lists/*
 RUN pip install --no-cache-dir flask beautifulsoup4 cloudscraper gunicorn
 
-# 4. Пишем гибкий код твоего личного Лампака
+WORKDIR /app
+
+# 3. Зашиваем конфигурацию Nginx прямо при сборке контейнера
+# Настраиваем его так, чтобы он слушал порт от Koyeb и отдавал файлы
+RUN echo ' \n\
+server { \n\
+    listen 8080; \n\
+    server_name _; \n\
+\n\
+    # Разрешаем CORS, чтобы Lampa не блокировала плагин \n\
+    add_header "Access-Control-Allow-Origin" "*"; \n\
+    add_header "Access-Control-Allow-Methods" "GET, OPTIONS"; \n\
+    add_header "Access-Control-Allow-Headers" "*"; \n\
+\n\
+    # Перенаправляем запросы Лампы на наш внутренний Python-парсер \n\
+    location / { \n\
+        proxy_pass http://127.0.0.1:5000; \n\
+        proxy_set_header Host $host; \n\
+        proxy_set_header X-Real-IP $remote_addr; \n\
+    } \n\
+} \n\
+' > /etc/nginx/sites-available/default
+
+# 4. Пишем код твоего личного Лампака (теперь он скрыт за Nginx на порту 5000)
 RUN cat << 'EOF' > main.py
 import os
 import urllib.parse
@@ -16,36 +37,21 @@ import cloudscraper
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-
-# Ссылка на скрытый сайт берется из переменных окружения в куебе
 TARGET = os.getenv("TARGET_SITE", "")
-
-# Создаем умный скрейпер для обхода Cloudflare под видом Windows Chrome
 scraper = cloudscraper.create_scraper(browser={"browser": "chrome", "platform": "windows", "desktop": True})
 
 @app.route("/")
 @app.route("/coweb")
 def coweb_index():
     host_addr = request.host
-    return f"""
-    <html>
-    <head><title>coWeb - Мой Лампак</title></head>
-    <body style="font-family: sans-serif; text-align: center; margin-top: 50px; background: #141414; color: white;">
-        <h1>Твой личный coWeb запущен!</h1>
-        <p>Ссылка для Лампы: <b style="color: #e50914;">http://{host_addr}/online.js</b></p>
-    </body>
-    </html>
-    """, 200
+    return f"<h1>Личный coWeb запущен!</h1><p>Ссылка для Лампы: http://{host_addr}/online.js</p>", 200
 
 @app.route("/online.js")
 def plugin():
     host_addr = request.host
-    # Полностью очищенный bundle-скрипт без внешних зависающих ссылок
     plugin_bundle = f"""
     (function () {{
         var current_host = window.location.protocol + "//" + "{host_addr}";
-        
-        // РЕГИСТРИРУЕМ СТРОГО ТВОЙ ЛИЧНЫЙ ПАРСЕР САЙТА
         Lampa.Plugins.add("trout_custom", function () {{
             Lampa.Extensions.add("online", function (object) {{
                 return {{
@@ -59,7 +65,6 @@ def plugin():
     """
     response = make_response(plugin_bundle)
     response.headers["Content-Type"] = "application/javascript"
-    response.headers["Access-Control-Allow-Origin"] = "*"
     return response
 
 @app.route("/search")
@@ -76,21 +81,16 @@ def search():
                 links.append({{"title": f"Смотреть онлайн [{{query}}]", "url": iframe["src"], "quality": "Auto"}})
             if not links:
                 links.append({{"title": f"Открыть плеер: {{query}}", "url": search_url, "quality": "Auto"}})
-            
-            resp = jsonify(links)
-            resp.headers["Access-Control-Allow-Origin"] = "*"
-            return resp
+            return jsonify(links)
     except: pass
-    
-    empty_resp = jsonify([])
-    empty_resp.headers["Access-Control-Allow-Origin"] = "*"
-    return empty_resp
+    return jsonify([])
 
 if __name__ == "__main__":
-    # ХАК ДЛЯ ОБЛАКА: Скрипт сам берет тот порт, который выделил Koyeb!
-    port = int(os.environ.get("PORT", 8000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="127.0.0.1", port=5000)
 EOF
 
-# Запускаем сервер через gunicorn, подстраивая его под системную переменную PORT от Koyeb
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-8000} main:app"]
+# 5. Декларируем внешний порт Nginx для Koyeb
+EXPOSE 8080
+
+# 6. Запускаем одновременно и веб-сервер Nginx, и твой Python-парсер
+CMD service nginx start && gunicorn --bind 127.0.0.1:5000 main:app
