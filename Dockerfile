@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
-# 1. Используем стабильную базу Linuxserver Prowlarr
+# 1. Берем за основу официальный готовый образ Prowlarr со всеми нужными зависимостями
 FROM linuxserver/prowlarr:latest
 
 WORKDIR /app
 
-# 2. Добавляем системный Node.js и bash
+# 2. Устанавливаем Node.js прямо внутрь стабильного окружения Prowlarr
 RUN apk add --no-cache nodejs bash
 
-# 3. Записываем серверный код через безопасный метод без ломающихся внутренних кавычек
+# 3. Записываем код нашего сервера-моста под Ридер (Чистый JS без конфликтов)
 COPY <<EOF /app/server.js
 const http = require('http');
 const url = require('url');
@@ -26,7 +26,6 @@ const server = http.createServer((req, res) => {
     if (parsedUrl.pathname === '/online.js' && parsedUrl.query.token === TOKEN) {
         res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
         
-        // Кавычки заменены на обратные штрихи, чтобы исключить конфликты синтаксиса
         const plugin = \`(function () { 
             'use strict'; 
             if (!window.Lampa) return; 
@@ -115,17 +114,19 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => console.log('Bridge ready'));
 EOF
 
-# 4. Исправленный скрипт запуска: Prowlarr вызывается по верному пути /app/Prowlarr
+# 4. Исправленный скрипт одновременного старта (с правильным путем к prowlarr)
 COPY <<EOF /app/entrypoint.sh
 #!/bin/bash
 mkdir -p /config
 echo '<Config><ApiKey>1234567890abcdef1234567890abcdef</ApiKey><AuthenticationMethod>None</AuthenticationMethod></Config>' > /config/config.xml
-/app/Prowlarr -nobrowser -data=/config &
+/usr/bin/prowlarr -nobrowser -data=/config &
 sleep 3
 exec node /app/server.js
 EOF
 
 RUN chmod +x /app/entrypoint.sh
 
+# 5. Открываем сетевой порт для Lampa
 EXPOSE 8080
+
 ENTRYPOINT ["/app/entrypoint.sh"]
