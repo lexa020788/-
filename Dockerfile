@@ -6,7 +6,7 @@ WORKDIR /app
 # 1. Устанавливаем Node.js и bash
 RUN apk add --no-cache nodejs bash
 
-# 2. Переписываем сервер: интеграция через Lampa.Component
+# 2. Переписываем сервер: полная замена стандартного модуля онлайн на наш Ридер
 COPY <<EOF /app/server.js
 const http = require('http');
 const url = require('url');
@@ -28,68 +28,54 @@ const server = http.createServer((req, res) => {
         const plugin = \`(function () { 
             'use strict'; 
             if (!window.Lampa) return; 
-            console.log('[Личный Про-Плагин]: Активация нативного модуля.'); 
             
-            // Настройка TorrServer и Поиска
+            console.log('[Личный Про-Плагин]: Нативная интеграция в модуль Онлайн.'); 
+            
+            // Настройка TorrServer и Поиска в облаке
             Lampa.Storage.set('torrserver_use', true); 
             Lampa.Storage.set('torrserver_url', 'http://127.0.0.1:8090'); 
             Lampa.Storage.set('parser_use', true); 
             Lampa.Storage.set('parser_torrent_url', '\${myDomain}/search'); 
             
-            // МАКСИМАЛЬНЫЙ УРОВЕНЬ ПРОФИ: Создаем официальный плагин-балансер.
-            // Lampa сама добавит пункт "Личный Онлайн" во встроенное меню выбора источников!
-            var inline_balancer = {
-                name: 'Личный Онлайн',
-                id: 'personal_reader',
-                main: function(component, movie) {
-                    var type = movie.number_of_seasons ? 'tv' : 'movie';
-                    var id = movie.imdb_id || movie.kinopoisk_id;
-                    
-                    if (!id) {
-                        Lampa.Noty.show('У этого фильма нет KP или IMDB ID.');
-                        return;
-                    }
-
-                    // Передаем фокус нашему Ридеру внутри родного интерфейса
+            // ХАК ПРОФИ: Перехватываем стандартный компонент онлайна Лампы.
+            // Теперь при нажатии на родную кнопку "Онлайн" в карточке запустится НАШ код!
+            var original_online = Lampa.Component.get('online');
+            
+            Lampa.Component.add('online', function (object, params) {
+                var movie = object.card || {};
+                var type = movie.number_of_seasons ? 'tv' : 'movie';
+                var id = movie.imdb_id || movie.kinopoisk_id;
+                
+                if (id) {
+                    // Перенаправляем пользователя во встроенный Ридер-плеер Лампы
                     Lampa.Component.add('reader', { 
                         title: 'Личный Онлайн', 
                         url: '\${myDomain}/reader-api?type=' + type + '&id=' + id
                     });
+                    
+                    // Вызываем Ридер вместо стандартного пустого экрана
+                    Lampa.Activity.push({
+                        title: 'Личный Онлайн',
+                        component: 'reader',
+                        page: 1
+                    });
+                } else if (original_online) {
+                    // Если у фильма нет ID, вызываем стандартный поиск Lampa (резерв)
+                    return new original_online(object, params);
+                } else {
+                    Lampa.Noty.show('ID фильма не найден.');
                 }
-            };
-
-            // Регистрируем наш плагин в глобальном списке онлайна Lampa
-            if (window.cloud_plugins) {
-                window.cloud_plugins.push(inline_balancer);
-            } else {
-                // Если Lampa запущена в базовом режиме, добавляем кнопку в левое меню как резерв
-                Lampa.Component.add('personal_online_menu', function(){
-                    this.create = function(){
-                        Lampa.Noty.show('Откройте карточку любого фильма для просмотра через Ридер.');
-                    };
-                });
-                // Добавляем пункт в главное левое меню
-                Lampa.MainMenu.add({
-                    id: 'personal_online_btn',
-                    index: 3,
-                    title: 'Личный Онлайн',
-                    icon: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://w3.org" style="width:100%;height:100%"><path d="M21 7V17C21 18.1 20.1 19 19 19H5C3.9 19 3 18.1 3 17V7C3 5.9 3.9 5 5 5H19C20.1 5 21 5.9 21 7Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M10 15L15 12L10 9V15Z" fill="currentColor"/></svg>',
-                    onSelect: function(){
-                        Lampa.Activity.push({
-                            title: 'Личный Онлайн',
-                            component: 'personal_online_menu',
-                            page: 1
-                        });
-                    }
-                });
-            }
+                
+                this.create = function () {};
+                this.destroy = function () {};
+            });
         })();\`;
         
         res.end(plugin);
         return;
     }
     
-    // ТОЧКА 2: Выдача онлайн потоков
+    // ТОЧКА 2: Выдача онлайн потоков в плеер Ридера
     if (parsedUrl.pathname === '/reader-api') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         const id = parsedUrl.query.id;
@@ -97,7 +83,7 @@ const server = http.createServer((req, res) => {
         let readerResponse = [];
         if (type === 'movie') {
             readerResponse = [{
-                title: 'Смотреть Фильм (Поток 1080p)',
+                title: 'Смотреть Фильм (Личный Поток 1080p)',
                 url: 'https://vidsrc.sh' + id,
                 quality: '1080p',
                 ready: true
@@ -111,7 +97,7 @@ const server = http.createServer((req, res) => {
         return res.end(JSON.stringify(readerResponse));
     }
     
-    // ТОЧКА 3: Поиск торрентов
+    // ТОЧКА 3: Поиск торрентов через Prowlarr
     if (parsedUrl.pathname === '/search') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         const q = parsedUrl.query.query || '';
