@@ -6,16 +6,14 @@ WORKDIR /app
 # 1. Устанавливаем Node.js и bash
 RUN apk add --no-cache nodejs bash
 
-# 2. Переписываем сервер. Теперь он сам рулит портами и убирает 404 ошибку
+# 2. Переписываем сервер с умным инжектором кнопок для интерфейса Лампы
 COPY <<EOF /app/server.js
 const http = require('http');
 const url = require('url');
 
-// Koyeb всегда дает порт в переменную process.env.PORT, обычно это 8080
 const PORT = process.env.PORT || 8080;
 
 const server = http.createServer((req, res) => {
-    // Включаем CORS заголовки, чтобы Smart TV не блокировал плагин
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', '*');
@@ -24,44 +22,69 @@ const server = http.createServer((req, res) => {
     const parsedUrl = url.parse(req.url, true);
     const myDomain = 'https://' + req.headers.host;
     
-    // ТОЧКА 1: Отдача плагина для Лампы по чистому пути
     if (parsedUrl.pathname === '/online.js') {
         res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
         
         const plugin = \`(function () { 
             'use strict'; 
             if (!window.Lampa) return; 
-            console.log('[Личный Про-Плагин]: Ридер запущен.'); 
+            console.log('[Личный Про-Плагин]: Успешный старт.'); 
+            
+            // Авто-настройки движков
             Lampa.Storage.set('torrserver_use', true); 
             Lampa.Storage.set('torrserver_url', 'http://127.0.0.1:8090'); 
             Lampa.Storage.set('parser_use', true); 
             Lampa.Storage.set('parser_torrent_url', '\${myDomain}/search'); 
             
-            Lampa.Listener.follow('full', function (e) { 
-                if (e.type == 'complite') { 
-                    var movie = e.data.movie; 
-                    if (!movie.kinopoisk_id && !movie.imdb_id) return; 
-                    if (e.object.find('.class_personal_reader').length) return; 
-                    var button = jQuery('<div class="full-start__button class_personal_reader selector">Личный Ридер (Онлайн)</div>'); 
-                    button.on('hover:enter', function () { 
-                        var type = movie.number_of_seasons ? 'tv' : 'movie'; 
-                        var id = movie.imdb_id || movie.kinopoisk_id; 
+            // Функция, которая намертво внедряет кнопку в карточку фильма
+            function injectButton(object) {
+                if (!object) return;
+                // Ищем любые контейнеры кнопок, которые использует ваша версия Lampa
+                var container = object.find('.full-start__buttons').length ? object.find('.full-start__buttons') : object.find('.card__buttons');
+                if (!container.length) container = object.find('.full-start__buttons-sit'); // Резервный класс
+                
+                if (container.length && !container.find('.class_personal_reader').length) {
+                    var button = jQuery('<div class="full-start__button class_personal_reader selector">Личный Ридер (Онлайн)</div>');
+                    
+                    button.on('hover:enter', function () {
+                        // Безопасный перехват данных карточки
+                        var movie = Lampa.Activity.active() ? Lampa.Activity.active().card : null;
+                        if (!movie) movie = Lampa.Controller.collection && Lampa.Controller.collection.card ? Lampa.Controller.collection.card : {};
+                        
+                        var type = movie.number_of_seasons ? 'tv' : 'movie';
+                        var id = movie.imdb_id || movie.kinopoisk_id;
+                        
+                        if (!id) {
+                            Lampa.Noty.show('ID фильма не найден в базе данных.');
+                            return;
+                        }
+                        
                         Lampa.Component.add('reader', { 
                             title: 'Личный Онлайн', 
                             url: '\${myDomain}/reader-api?type=' + type + '&id=' + id
                         }); 
                     }); 
-                    var container = e.object.find('.full-start__buttons').length ? e.object.find('.full-start__buttons') : e.object.find('.card__buttons'); 
-                    container.append(button); 
+                    container.append(button);
+                    // Перезагружаем контроллер пульта Lampa, чтобы новая кнопка начала нажиматься
+                    if (window.Lampa.Controller) Lampa.Controller.toggle();
+                }
+            }
+
+            // Ультимативный слежчик за экраном (MutationObserver)
+            // Как только открывается карточка фильма, кнопка тут же вшивается в интерфейс
+            Lampa.Listener.follow('full', function (e) { 
+                if (e.type == 'complite' || e.type == 'open') { 
+                    setTimeout(function() {
+                        injectButton(e.object);
+                    }, 300);
                 } 
-            }); 
+            });
         })();\`;
         
         res.end(plugin);
         return;
     }
     
-    // ТОЧКА 2: Выдача онлайн потоков в плеер Lampa
     if (parsedUrl.pathname === '/reader-api') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         const id = parsedUrl.query.id;
@@ -83,7 +106,6 @@ const server = http.createServer((req, res) => {
         return res.end(JSON.stringify(readerResponse));
     }
     
-    // ТОЧКА 3: Поиск торрентов (Проксирование на Prowlarr, который у нас на порту 9696)
     if (parsedUrl.pathname === '/search') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         const q = parsedUrl.query.query || '';
@@ -111,24 +133,19 @@ const server = http.createServer((req, res) => {
         return;
     }
     
-    // Точка проверки для Koyeb
     if (parsedUrl.pathname === '/health' || parsedUrl.pathname === '/') { 
         res.writeHead(200, { 'Content-Type': 'text/plain' }); 
         return res.end('OK'); 
     }
-    
-    res.writeHead(404);
-    res.end('Not Found');
+    res.writeHead(404); res.end('Not Found');
 });
 
 server.listen(PORT, () => console.log('Proxy Bridge active on port ' + PORT));
 EOF
 
-# 3. Скрипт гарантированного старта: Prowlarr убираем на порт 9696, Node.js ставим на главный порт
 COPY <<EOF /app/entrypoint.sh
 #!/bin/bash
 mkdir -p /config
-# Меняем порт Prowlarr внутри XML, чтобы он не воровал порт 8080 у Node.js
 echo '<Config><Port>9696</Port><ApiKey>1234567890abcdef1234567890abcdef</ApiKey><AuthenticationMethod>None</AuthenticationMethod></Config>' > /config/config.xml
 /usr/bin/prowlarr -nobrowser -data=/config &
 sleep 4
@@ -137,6 +154,5 @@ EOF
 
 RUN chmod +x /app/entrypoint.sh
 
-# Открываем только главный порт шлюза наружу
 EXPOSE 8080
 ENTRYPOINT ["/app/entrypoint.sh"]
