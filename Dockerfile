@@ -1,39 +1,41 @@
 # syntax=docker/dockerfile:1
-# 1. Берем за основу официальный готовый образ Prowlarr со всеми нужными зависимостями
 FROM linuxserver/prowlarr:latest
 
 WORKDIR /app
 
-# 2. Устанавливаем Node.js прямо внутрь стабильного окружения Prowlarr
+# 1. Устанавливаем Node.js и bash
 RUN apk add --no-cache nodejs bash
 
-# 3. Записываем код нашего сервера-моста под Ридер (Чистый JS без конфликтов)
+# 2. Переписываем сервер. Теперь он сам рулит портами и убирает 404 ошибку
 COPY <<EOF /app/server.js
 const http = require('http');
 const url = require('url');
 
+// Koyeb всегда дает порт в переменную process.env.PORT, обычно это 8080
 const PORT = process.env.PORT || 8080;
-const TOKEN = process.env.SECRET_TOKEN || 'my_lampa_secret_2026';
 
 const server = http.createServer((req, res) => {
+    // Включаем CORS заголовки, чтобы Smart TV не блокировал плагин
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', '*');
     if (req.method === 'OPTIONS') { res.writeHead(200); return res.end(); }
     
     const parsedUrl = url.parse(req.url, true);
     const myDomain = 'https://' + req.headers.host;
     
-    if (parsedUrl.pathname === '/online.js' && parsedUrl.query.token === TOKEN) {
+    // ТОЧКА 1: Отдача плагина для Лампы по чистому пути
+    if (parsedUrl.pathname === '/online.js') {
         res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
         
         const plugin = \`(function () { 
             'use strict'; 
             if (!window.Lampa) return; 
-            console.log('[Личный Про-Плагин]: Ридер активирован.'); 
+            console.log('[Личный Про-Плагин]: Ридер запущен.'); 
             Lampa.Storage.set('torrserver_use', true); 
             Lampa.Storage.set('torrserver_url', 'http://127.0.0.1:8090'); 
             Lampa.Storage.set('parser_use', true); 
-            Lampa.Storage.set('parser_torrent_url', '\${myDomain}/search?token=\${TOKEN}'); 
+            Lampa.Storage.set('parser_torrent_url', '\${myDomain}/search'); 
             
             Lampa.Listener.follow('full', function (e) { 
                 if (e.type == 'complite') { 
@@ -46,7 +48,7 @@ const server = http.createServer((req, res) => {
                         var id = movie.imdb_id || movie.kinopoisk_id; 
                         Lampa.Component.add('reader', { 
                             title: 'Личный Онлайн', 
-                            url: '\${myDomain}/reader-api?type=' + type + '&id=' + id + '&token=\${TOKEN}' 
+                            url: '\${myDomain}/reader-api?type=' + type + '&id=' + id
                         }); 
                     }); 
                     var container = e.object.find('.full-start__buttons').length ? e.object.find('.full-start__buttons') : e.object.find('.card__buttons'); 
@@ -59,7 +61,8 @@ const server = http.createServer((req, res) => {
         return;
     }
     
-    if (parsedUrl.pathname === '/reader-api' && parsedUrl.query.token === TOKEN) {
+    // ТОЧКА 2: Выдача онлайн потоков в плеер Lampa
+    if (parsedUrl.pathname === '/reader-api') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         const id = parsedUrl.query.id;
         const type = parsedUrl.query.type || 'movie';
@@ -80,7 +83,8 @@ const server = http.createServer((req, res) => {
         return res.end(JSON.stringify(readerResponse));
     }
     
-    if (parsedUrl.pathname === '/search' && parsedUrl.query.token === TOKEN) {
+    // ТОЧКА 3: Поиск торрентов (Проксирование на Prowlarr, который у нас на порту 9696)
+    if (parsedUrl.pathname === '/search') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         const q = parsedUrl.query.query || '';
         const prowlarrUrl = 'http://127.0.0' + encodeURIComponent(q);
@@ -107,26 +111,32 @@ const server = http.createServer((req, res) => {
         return;
     }
     
-    if (parsedUrl.pathname === '/health') { res.writeHead(200); return res.end('OK'); }
-    res.writeHead(403); res.end('Forbidden');
+    // Точка проверки для Koyeb
+    if (parsedUrl.pathname === '/health' || parsedUrl.pathname === '/') { 
+        res.writeHead(200, { 'Content-Type': 'text/plain' }); 
+        return res.end('OK'); 
+    }
+    
+    res.writeHead(404);
+    res.end('Not Found');
 });
 
-server.listen(PORT, () => console.log('Bridge ready'));
+server.listen(PORT, () => console.log('Proxy Bridge active on port ' + PORT));
 EOF
 
-# 4. Исправленный скрипт одновременного старта (с правильным путем к prowlarr)
+# 3. Скрипт гарантированного старта: Prowlarr убираем на порт 9696, Node.js ставим на главный порт
 COPY <<EOF /app/entrypoint.sh
 #!/bin/bash
 mkdir -p /config
-echo '<Config><ApiKey>1234567890abcdef1234567890abcdef</ApiKey><AuthenticationMethod>None</AuthenticationMethod></Config>' > /config/config.xml
+# Меняем порт Prowlarr внутри XML, чтобы он не воровал порт 8080 у Node.js
+echo '<Config><Port>9696</Port><ApiKey>1234567890abcdef1234567890abcdef</ApiKey><AuthenticationMethod>None</AuthenticationMethod></Config>' > /config/config.xml
 /usr/bin/prowlarr -nobrowser -data=/config &
-sleep 3
+sleep 4
 exec node /app/server.js
 EOF
 
 RUN chmod +x /app/entrypoint.sh
 
-# 5. Открываем сетевой порт для Lampa
+# Открываем только главный порт шлюза наружу
 EXPOSE 8080
-
 ENTRYPOINT ["/app/entrypoint.sh"]
