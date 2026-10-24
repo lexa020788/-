@@ -1,24 +1,22 @@
-# syntax=docker/dockerfile:1
-FROM ubuntu:22.04
+# 1. Используем официальный готовый контейнер с Prowlarr как донора
+FROM linuxserver/prowlarr:latest AS prowlarr_source
 
-ENV DEBIAN_FRONTEND=noninteractive
+# 2. Переходим на официальный легкий образ Node.js (база для нашего моста)
+FROM node:20-slim
+
 WORKDIR /app
 
-# 1. Системный софт и Node.js
+# 3. Устанавливаем системные зависимости для работы .NET ядра Prowlarr
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    ca-certificates \
     sqlite3 \
     libicu70 \
-    nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Скачивание Prowlarr через прямую ссылку GitHub (БЕЗ ломающих символов ? и &)
-RUN curl -L "https://github.com" -o prowlarr.tar.gz \
-    && tar -xvzf prowlarr.tar.gz \
-    && rm prowlarr.tar.gz
+# 4. Копируем готовый, распакованный Prowlarr напрямую из первого контейнера
+# Без скачиваний из интернета, без curl и без ломающихся ссылок!
+COPY --from=prowlarr_source /app/prowlarr /app/prowlarr
 
-# 3. Запись серверного кода (Умный мост под Ридер)
+# 5. Записываем код нашего сервера-моста под Ридер
 COPY <<EOF /app/server.js
 const http = require('http');
 const url = require('url');
@@ -122,12 +120,12 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => console.log('Bridge ready'));
 EOF
 
-# 4. Скрипт автоматического запуска
+# 6. Записываем скрипт запуска
 COPY <<EOF /app/entrypoint.sh
 #!/bin/bash
 mkdir -p /config
 echo '<Config><ApiKey>1234567890abcdef1234567890abcdef</ApiKey><AuthenticationMethod>None</AuthenticationMethod></Config>' > /config/config.xml
-/app/Prowlarr/Prowlarr -nobrowser -data=/config &
+/app/prowlarr/Prowlarr -nobrowser -data=/config &
 sleep 3
 exec node /app/server.js
 EOF
