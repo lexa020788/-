@@ -1,12 +1,13 @@
-# 1. Берем за основу официальный готовый образ Prowlarr со всеми нужными зависимостями
+# syntax=docker/dockerfile:1
+# 1. Используем стабильную базу Linuxserver Prowlarr
 FROM linuxserver/prowlarr:latest
 
 WORKDIR /app
 
-# 2. Устанавливаем Node.js прямо внутрь стабильного окружения Prowlarr
+# 2. Добавляем системный Node.js и bash
 RUN apk add --no-cache nodejs bash
 
-# 3. Записываем код нашего сервера-моста под Ридер (Чистый JS без конфликтов)
+# 3. Записываем серверный код через безопасный метод без ломающихся внутренних кавычек
 COPY <<EOF /app/server.js
 const http = require('http');
 const url = require('url');
@@ -25,33 +26,35 @@ const server = http.createServer((req, res) => {
     if (parsedUrl.pathname === '/online.js' && parsedUrl.query.token === TOKEN) {
         res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
         
-        const plugin = "(function () { " +
-            "'use strict'; " +
-            "if (!window.Lampa) return; " +
-            "console.log('[Личный Про-Плагин]: Ридер активирован.'); " +
-            "Lampa.Storage.set('torrserver_use', true); " +
-            "Lampa.Storage.set('torrserver_url', 'http://127.0.0.1:8090'); " +
-            "Lampa.Storage.set('parser_use', true); " +
-            "Lampa.Storage.set('parser_torrent_url', '" + myDomain + "/search?token=" + TOKEN + "'); " +
-            "Lampa.Listener.follow('full', function (e) { " +
-                "if (e.type == 'complite') { " +
-                    "var movie = e.data.movie; " +
-                    "if (!movie.kinopoisk_id && !movie.imdb_id) return; " +
-                    "if (e.object.find('.class_personal_reader').length) return; " +
-                    "var button = jQuery('<div class=\"full-start__button class_personal_reader selector\">Личный Ридер (Онлайн)</div>'); " +
-                    "button.on('hover:enter', function () { " +
-                        "var type = movie.number_of_seasons ? 'tv' : 'movie'; " +
-                        "var id = movie.imdb_id || movie.kinopoisk_id; " +
-                        "Lampa.Component.add('reader', { " +
-                            "title: 'Личный Онлайн', " +
-                            "url: '" + myDomain + "/reader-api?type=' + type + '&id=' + id + '&token=" + TOKEN + "' " +
-                        "}); " +
-                    "}); " +
-                    "var container = e.object.find('.full-start__buttons').length ? e.object.find('.full-start__buttons') : e.object.find('.card__buttons'); " +
-                    "container.append(button); " +
-                "} " +
-            "}); " +
-        "})();";
+        // Кавычки заменены на обратные штрихи, чтобы исключить конфликты синтаксиса
+        const plugin = \`(function () { 
+            'use strict'; 
+            if (!window.Lampa) return; 
+            console.log('[Личный Про-Плагин]: Ридер активирован.'); 
+            Lampa.Storage.set('torrserver_use', true); 
+            Lampa.Storage.set('torrserver_url', 'http://127.0.0.1:8090'); 
+            Lampa.Storage.set('parser_use', true); 
+            Lampa.Storage.set('parser_torrent_url', '\${myDomain}/search?token=\${TOKEN}'); 
+            
+            Lampa.Listener.follow('full', function (e) { 
+                if (e.type == 'complite') { 
+                    var movie = e.data.movie; 
+                    if (!movie.kinopoisk_id && !movie.imdb_id) return; 
+                    if (e.object.find('.class_personal_reader').length) return; 
+                    var button = jQuery('<div class="full-start__button class_personal_reader selector">Личный Ридер (Онлайн)</div>'); 
+                    button.on('hover:enter', function () { 
+                        var type = movie.number_of_seasons ? 'tv' : 'movie'; 
+                        var id = movie.imdb_id || movie.kinopoisk_id; 
+                        Lampa.Component.add('reader', { 
+                            title: 'Личный Онлайн', 
+                            url: '\${myDomain}/reader-api?type=' + type + '&id=' + id + '&token=\${TOKEN}' 
+                        }); 
+                    }); 
+                    var container = e.object.find('.full-start__buttons').length ? e.object.find('.full-start__buttons') : e.object.find('.card__buttons'); 
+                    container.append(button); 
+                } 
+            }); 
+        })();\`;
         
         res.end(plugin);
         return;
@@ -112,19 +115,17 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => console.log('Bridge ready'));
 EOF
 
-# 4. Записываем автоматический скрипт одновременного старта
+# 4. Исправленный скрипт запуска: Prowlarr вызывается по верному пути /app/Prowlarr
 COPY <<EOF /app/entrypoint.sh
 #!/bin/bash
 mkdir -p /config
 echo '<Config><ApiKey>1234567890abcdef1234567890abcdef</ApiKey><AuthenticationMethod>None</AuthenticationMethod></Config>' > /config/config.xml
-/app/prowlarr/Prowlarr -nobrowser -data=/config &
+/app/Prowlarr -nobrowser -data=/config &
 sleep 3
 exec node /app/server.js
 EOF
 
 RUN chmod +x /app/entrypoint.sh
 
-# 5. Открываем сетевой порт для Lampa
 EXPOSE 8080
-
 ENTRYPOINT ["/app/entrypoint.sh"]
