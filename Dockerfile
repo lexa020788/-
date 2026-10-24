@@ -6,7 +6,7 @@ WORKDIR /app
 # 1. Устанавливаем Node.js и bash
 RUN apk add --no-cache nodejs bash
 
-# 2. Переписываем сервер: полная замена стандартного модуля онлайн на наш Ридер
+# 2. Переписываем сервер: создаем полноценный онлайн-парсер (балансер)
 COPY <<EOF /app/server.js
 const http = require('http');
 const url = require('url');
@@ -22,6 +22,7 @@ const server = http.createServer((req, res) => {
     const parsedUrl = url.parse(req.url, true);
     const myDomain = 'https://' + req.headers.host;
     
+    // ТОЧКА 1: Выдача JS-скрипта, который регистрирует ОНЛАЙН-ПАРСЕР
     if (parsedUrl.pathname === '/online.js') {
         res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
         
@@ -29,53 +30,53 @@ const server = http.createServer((req, res) => {
             'use strict'; 
             if (!window.Lampa) return; 
             
-            console.log('[Личный Про-Плагин]: Нативная интеграция в модуль Онлайн.'); 
+            console.log('[Личный Про-Плагин]: Онлайн-парсер успешно интегрирован.'); 
             
-            // Настройка TorrServer и Поиска в облаке
+            // Настройка TorrServer и Торрент-Парсера в облаке
             Lampa.Storage.set('torrserver_use', true); 
             Lampa.Storage.set('torrserver_url', 'http://127.0.0.1:8090'); 
             Lampa.Storage.set('parser_use', true); 
             Lampa.Storage.set('parser_torrent_url', '\${myDomain}/search'); 
             
-            // ХАК ПРОФИ: Перехватываем стандартный компонент онлайна Лампы.
-            // Теперь при нажатии на родную кнопку "Онлайн" в карточке запустится НАШ код!
-            var original_online = Lampa.Component.get('online');
-            
-            Lampa.Component.add('online', function (object, params) {
+            // РЕГИСТРАЦИЯ ОФИЦИАЛЬНОГО ОНЛАЙН-ПАРСЕРА ДЛЯ КНОПКИ "ОНЛАЙН"
+            // Теперь ЛАМПА знает, что за онлайном нужно ходить на ваш Koyeb!
+            function ЛичныйПарсер(object) {
+                var comp = this;
                 var movie = object.card || {};
                 var type = movie.number_of_seasons ? 'tv' : 'movie';
                 var id = movie.imdb_id || movie.kinopoisk_id;
-                
-                if (id) {
-                    // Перенаправляем пользователя во встроенный Ридер-плеер Лампы
+
+                this.create = function () {
+                    if (!id) {
+                        Lampa.Noty.show('У этого фильма нет KP или IMDB ID.');
+                        return;
+                    }
+
+                    // Вызываем встроенный Ридер-плеер Лампы, передавая ему структуру папок с Koyeb
                     Lampa.Component.add('reader', { 
                         title: 'Личный Онлайн', 
                         url: '\${myDomain}/reader-api?type=' + type + '&id=' + id
                     });
                     
-                    // Вызываем Ридер вместо стандартного пустого экрана
                     Lampa.Activity.push({
                         title: 'Личный Онлайн',
                         component: 'reader',
                         page: 1
                     });
-                } else if (original_online) {
-                    // Если у фильма нет ID, вызываем стандартный поиск Lampa (резерв)
-                    return new original_online(object, params);
-                } else {
-                    Lampa.Noty.show('ID фильма не найден.');
-                }
-                
-                this.create = function () {};
+                };
+
                 this.destroy = function () {};
-            });
+            }
+
+            // Внедряем наш парсер в систему онлайна Lampa
+            Lampa.Component.add('online', ЛичныйПарсер);
         })();\`;
         
         res.end(plugin);
         return;
     }
     
-    // ТОЧКА 2: Выдача онлайн потоков в плеер Ридера
+    // ТОЧКА 2: Ридер-API (Выдача онлайн потоков во встроенный плеер Ридера)
     if (parsedUrl.pathname === '/reader-api') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         const id = parsedUrl.query.id;
