@@ -1,22 +1,12 @@
-# 1. Используем официальный готовый контейнер с Prowlarr как донора
-FROM linuxserver/prowlarr:latest AS prowlarr_source
-
-# 2. Переходим на официальный легкий образ Node.js (база для нашего моста)
-FROM node:20-slim
+# 1. Берем за основу официальный готовый образ Prowlarr со всеми нужными зависимостями
+FROM linuxserver/prowlarr:latest
 
 WORKDIR /app
 
-# 3. Устанавливаем системные зависимости для работы .NET ядра Prowlarr
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    sqlite3 \
-    libicu70 \
-    && rm -rf /var/lib/apt/lists/*
+# 2. Устанавливаем Node.js прямо внутрь стабильного окружения Prowlarr
+RUN apk add --no-cache nodejs bash
 
-# 4. Копируем готовый, распакованный Prowlarr напрямую из первого контейнера
-# Без скачиваний из интернета, без curl и без ломающихся ссылок!
-COPY --from=prowlarr_source /app/prowlarr /app/prowlarr
-
-# 5. Записываем код нашего сервера-моста под Ридер
+# 3. Записываем код нашего сервера-моста под Ридер (Чистый JS без конфликтов)
 COPY <<EOF /app/server.js
 const http = require('http');
 const url = require('url');
@@ -92,6 +82,8 @@ const server = http.createServer((req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         const q = parsedUrl.query.query || '';
         const prowlarrUrl = 'http://127.0.0' + encodeURIComponent(q);
+        
+        const http = require('http');
         http.get(prowlarrUrl, (pRes) => {
             let body = '';
             pRes.on('data', chunk => body += chunk);
@@ -120,7 +112,7 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => console.log('Bridge ready'));
 EOF
 
-# 6. Записываем скрипт запуска
+# 4. Записываем автоматический скрипт одновременного старта
 COPY <<EOF /app/entrypoint.sh
 #!/bin/bash
 mkdir -p /config
@@ -132,5 +124,7 @@ EOF
 
 RUN chmod +x /app/entrypoint.sh
 
+# 5. Открываем сетевой порт для Lampa
 EXPOSE 8080
+
 ENTRYPOINT ["/app/entrypoint.sh"]
