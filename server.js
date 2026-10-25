@@ -4,8 +4,7 @@ const url = require('url');
 
 const PORT = process.env.PORT || 8080;
 
-// Брем токен безопасности из переменных окружения Koyeb.
-// Если переменная не задана, по умолчанию будет использоваться скрытая заглушка 'secured_mode'
+// Токен безопасности из переменных окружения Koyeb.
 const SECRET_TOKEN = process.env.PLUGIN_TOKEN || 'secured_mode';
 
 function fetchJson(targetUrl) {
@@ -22,7 +21,7 @@ function fetchJson(targetUrl) {
 }
 
 const server = http.createServer(async (req, res) => {
-    // CORS-заголовки, чтобы мобильный Chrome и ТВ не блокировали запросы
+    // CORS-заголовки для работы на ТВ и мобильном Chrome
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', '*');
@@ -36,7 +35,7 @@ const server = http.createServer(async (req, res) => {
     const parsedUrl = url.parse(req.url, true);
     const myDomain = 'https://' + req.headers.host;
     
-    // ПРОВЕРКА БЕЗОПАСНОСТИ: Сверяем токен из ссылки с переменной PLUGIN_TOKEN
+    // ПРОВЕРКА БЕЗОПАСНОСТИ
     const userToken = parsedUrl.query.token || '';
     if (parsedUrl.pathname !== '/health' && parsedUrl.pathname !== '/' && userToken !== SECRET_TOKEN) {
         res.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -137,12 +136,15 @@ const server = http.createServer(async (req, res) => {
         }
         if (kpId) {
             const kinoboxData = await fetchJson('https://kinobox.tv' + kpId);
-            if (kinoboxData && Array.isArray(kinoboxData)) {
+            if (kinoboxData && Array.isArray(kinoboxData) && kinoboxData.length > 0) {
                 kinoboxData.forEach(player => {
                     if (player.link) {
                         streams.push({ title: '🍿 Русская озвучка [' + player.source.toUpperCase() + ']', url: player.link });
                     }
                 });
+            } else {
+                // Если облачный сервер заблокирован, отдаем прямую Iframe-ссылку, работающую у клиента дома
+                streams.push({ title: '🍿 Альтернативный плеер [Kinobox Web]', url: 'https://kinobox.tv' + kpId });
             }
         }
         return res.end(JSON.stringify(streams));
@@ -160,7 +162,22 @@ const server = http.createServer(async (req, res) => {
             pRes.on('end', () => {
                 try {
                     const results = JSON.parse(body);
-                    const lampaFormat = results.map(item => ({ title: item.title, seeders: item.seeders || 0, leechers: (item.peers - item.seeders) || 0, size: item.size, magnet: item.magnetUrl || item.downloadUrl, tracker: item.indexer }));
+                    if (!Array.isArray(results)) {
+                        return res.end(JSON.stringify({ result: [] }));
+                    }
+                    const lampaFormat = results.map(item => {
+                        const seeders = item.seeders || 0;
+                        const peers = item.peers || 0;
+                        const leechers = peers >= seeders ? (peers - seeders) : 0;
+                        return { 
+                            title: item.title, 
+                            seeders: seeders, 
+                            leechers: leechers, 
+                            size: item.size || 0, 
+                            magnet: item.magnetUrl || item.downloadUrl || '', 
+                            tracker: item.indexer || 'Prowlarr' 
+                        };
+                    });
                     res.end(JSON.stringify({ result: lampaFormat }));
                 } catch(e) { res.end(JSON.stringify({ result: [] })); }
             });
