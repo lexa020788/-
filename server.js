@@ -2,7 +2,8 @@ const http = require('http');
 const https = require('https');
 const url = require('url');
 
-const PORT = process.env.PORT || 8080;
+// Замените старую строку const PORT = ... на этот код:
+const PORT = process.argv[2] || process.env.PORT || 8080;
 const SECRET_TOKEN = process.env.PLUGIN_TOKEN || 'secured_mode';
 
 function fetchJson(targetUrl) {
