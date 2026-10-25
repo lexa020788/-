@@ -18,14 +18,21 @@ function fetchJson(targetUrl) {
 }
 
 const server = http.createServer(async (req, res) => {
+    // Выставляем жесткие CORS-заголовки для борьбы с блокировками браузеров
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', '*');
-    if (req.method === 'OPTIONS') { res.writeHead(200); return res.end(); }
+    res.setHeader('Access-Control-Allow-Private-Network', 'true');
+    
+    if (req.method === 'OPTIONS') { 
+        res.writeHead(200); 
+        return res.end(); 
+    }
     
     const parsedUrl = url.parse(req.url, true);
     const myDomain = 'https://' + req.headers.host;
     
+    // ТОЧКА 1: Выдача плагина со встроенной поддержкой CORS
     if (parsedUrl.pathname === '/online.js') {
         res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
         
@@ -33,8 +40,9 @@ const server = http.createServer(async (req, res) => {
             'use strict'; 
             if (!window.Lampa) return; 
             
-            console.log('[Личный Про-Плагин]: Мобильный и ТВ плагин активен.'); 
+            console.log('[Личный Про-Плагин]: Мобильный и ТВ плагин запущен.'); 
             
+            // Синхронизация торрент-поиска на себя
             Lampa.Storage.set('torrserver_use', true); 
             Lampa.Storage.set('torrserver_url', 'http://127.0.0.1:8090'); 
             Lampa.Storage.set('parser_use', true); 
@@ -77,27 +85,37 @@ const server = http.createServer(async (req, res) => {
                 this.render = function () { return comp.activity.render(); };
             }
             
+            // Регистрируем компонент в системе Lampa
             Lampa.Component.add('my_private_online', ЛичныйПарсер);
             
-            Lampa.plugins.add('my_private_online_btn', function(object){
-                object.add({
-                    name: 'Личный Онлайн',
-                    icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://w3.org"><path d="M21 7V17C21 18.1 20.1 19 19 19H5C3.9 19 3 18.1 3 17V7C3 5.9 3.9 5 5 5H19C20.1 5 21 5.9 21 7ZM19 7H5V17H19V7Z" fill="currentColor"/><path d="M10 9.5V14.5L14.5 12L10 9.5Z" fill="currentColor"/></svg>',
-                    click: function(){
-                        Lampa.Activity.push({
-                            title: 'Личный Онлайн',
-                            component: 'my_private_online',
-                            card: object.card,
-                            page: 1
-                        });
-                    }
-                });
+            // Самый надежный и совместимый метод внедрения кнопки для мобильных (через Full)
+            Lampa.Listener.follow('activity', function (e) {
+                if (e.type === 'create' && e.component === 'full') {
+                    setTimeout(function() {
+                        var page = e.object;
+                        if (page && page.plugins && typeof page.plugins.add === 'function') {
+                            page.plugins.add({
+                                name: 'Личный Онлайн',
+                                icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://w3.org"><path d="M21 7V17C21 18.1 20.1 19 19 19H5C3.9 19 3 18.1 3 17V7C3 5.9 3.9 5 5 5H19C20.1 5 21 5.9 21 7ZM19 7H5V17H19V7Z" fill="currentColor"/><path d="M10 9.5V14.5L14.5 12L10 9.5Z" fill="currentColor"/></svg>',
+                                click: function() {
+                                    Lampa.Activity.push({
+                                        title: 'Личный Онлайн',
+                                        component: 'my_private_online',
+                                        card: e.object.card,
+                                        page: 1
+                                    });
+                                }
+                            });
+                        }
+                    }, 400);
+                }
             });
         })();`;
         
         return res.end(plugin);
     }
     
+    // ТОЧКА 2: Сбор потоков с балансеров
     if (parsedUrl.pathname === '/reader-api') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         const kpId = parsedUrl.query.kp || '';
@@ -122,6 +140,7 @@ const server = http.createServer(async (req, res) => {
         return res.end(JSON.stringify(streams));
     }
     
+    // ТОЧКА 3: Торрент-поиск через Prowlarr
     if (parsedUrl.pathname === '/search') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         const q = parsedUrl.query.query || '';
@@ -141,7 +160,10 @@ const server = http.createServer(async (req, res) => {
         return;
     }
     
-    if (parsedUrl.pathname === '/health' || parsedUrl.pathname === '/') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end('OK'); }
+    if (parsedUrl.pathname === '/health' || parsedUrl.pathname === '/') { 
+        res.writeHead(200, { 'Content-Type': 'text/plain' }); 
+        return res.end('OK'); 
+    }
     res.writeHead(404); res.end('Not Found');
 });
 
