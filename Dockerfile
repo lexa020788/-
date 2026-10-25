@@ -6,7 +6,7 @@ WORKDIR /app
 # 1. Устанавливаем Node.js, bash и curl для работы автонастройки
 RUN apk add --no-cache nodejs bash curl
 
-# 2. Создаем файл server.js построчно (без использования <<EOF)
+# 2. Создаем файл server.js построчно
 RUN echo "const http = require('http');" > /app/server.js \
     && echo "const https = require('https');" >> /app/server.js \
     && echo "const url = require('url');" >> /app/server.js \
@@ -48,7 +48,7 @@ RUN echo "const http = require('http');" > /app/server.js \
     && echo "        if (kpId) {" >> /app/server.js \
     && echo "            const kinoboxData = await fetchJson('https://kinobox.tv' + kpId);" >> /app/server.js \
     && echo "            if (kinoboxData && Array.isArray(kinoboxData)) {" >> /app/server.js \
-    && echo "                kinoboxData.forEach(player => {" >> /app/server.js \
+    >> echo "                kinoboxData.forEach(player => {" >> /app/server.js \
     && echo "                    if (player.link) { streams.push({ title: '🍿 Русская озвучка [' + player.source.toUpperCase() + ']', url: player.link, quality: '1080p' }); }" >> /app/server.js \
     && echo "                });" >> /app/server.js \
     && echo "            }" >> /app/server.js \
@@ -69,7 +69,7 @@ RUN echo "const http = require('http');" > /app/server.js \
     && echo "                    res.end(JSON.stringify({ result: lampaFormat }));" >> /app/server.js \
     && echo "                } catch(e) { res.end(JSON.stringify({ result: [] })); }" >> /app/server.js \
     && echo "            });" >> /app/server.js \
-    && echo "        }).on('error', () => res.end(JSON.stringify({ result: [] })));" >> /app/server.js \
+    }).on('error', () => res.end(JSON.stringify({ result: [] })));" >> /app/server.js \
     && echo "        return;" >> /app/server.js \
     && echo "    }" >> /app/server.js \
     && echo "    if (parsedUrl.pathname === '/health' || parsedUrl.pathname === '/') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end('OK'); }" >> /app/server.js \
@@ -77,4 +77,4 @@ RUN echo "const http = require('http');" > /app/server.js \
     && echo "});" >> /app/server.js \
     && echo "server.listen(PORT, () => console.log('Proxy Bridge active on port ' + PORT));" >> /app/server.js
 
-# 3. Генерируем entrypoint.sh из защищенной Base64 строки (Решает проблему с символами $ и \)
+# 3. Генерируем entrypoint.sh (Вшит новый config.xml, обходящий защиту авторизации)
