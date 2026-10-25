@@ -14,7 +14,7 @@ RUN apk add --no-cache \
     git
 
 # 2. Устанавливаем Solvearr по полному корректному адресу репозитория
-RUN pip3 install --break-system-packages git+https://github.com
+RUN pip3 install --break-system-packages solvearr
 
 # 3. Копируем наш прокси-мост
 COPY server.js /app/server.js
