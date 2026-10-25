@@ -3,16 +3,17 @@ FROM linuxserver/prowlarr:latest
 
 WORKDIR /app
 
-# 1. Устанавливаем Node.js, curl, python3 и pip через менеджер пакетов Alpine (apk)
+# 1. Устанавливаем Node.js, curl, python3, pip, bash и ОБЯЗАТЕЛЬНО git для скачивания Solvearr
 RUN apk add --no-cache \
     nodejs \
     npm \
     curl \
     python3 \
     py3-pip \
-    bash
+    bash \
+    git
 
-# 2. Устанавливаем Solvearr для обхода Cloudflare
+# 2. Устанавливаем Solvearr по полному корректному адресу репозитория
 RUN pip3 install --break-system-packages git+https://github.com
 
 # 3. Копируем наш прокси-мост
@@ -54,5 +55,5 @@ RUN mkdir -p /etc/services.d/node-server && echo '#!/usr/bin/with-contenv bash\n
 exec node /app/server.js\n\
 ' > /etc/services.d/node-server/run && chmod +x /etc/services.d/node-server/run
 
-# Открываем порт прокси-сервера
+# Открываем внешний порт прокси-моста
 EXPOSE 8080
