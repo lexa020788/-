@@ -4,6 +4,10 @@ const url = require('url');
 
 const PORT = process.env.PORT || 8080;
 
+// Брем токен безопасности из переменных окружения Koyeb.
+// Если переменная не задана, по умолчанию будет использоваться скрытая заглушка 'secured_mode'
+const SECRET_TOKEN = process.env.PLUGIN_TOKEN || 'secured_mode';
+
 function fetchJson(targetUrl) {
     return new Promise((resolve) => {
         const client = targetUrl.startsWith('https') ? https : http;
@@ -18,7 +22,7 @@ function fetchJson(targetUrl) {
 }
 
 const server = http.createServer(async (req, res) => {
-    // Выставляем жесткие CORS-заголовки для борьбы с блокировками браузеров
+    // CORS-заголовки, чтобы мобильный Chrome и ТВ не блокировали запросы
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', '*');
@@ -32,7 +36,14 @@ const server = http.createServer(async (req, res) => {
     const parsedUrl = url.parse(req.url, true);
     const myDomain = 'https://' + req.headers.host;
     
-    // ТОЧКА 1: Выдача плагина со встроенной поддержкой CORS
+    // ПРОВЕРКА БЕЗОПАСНОСТИ: Сверяем токен из ссылки с переменной PLUGIN_TOKEN
+    const userToken = parsedUrl.query.token || '';
+    if (parsedUrl.pathname !== '/health' && parsedUrl.pathname !== '/' && userToken !== SECRET_TOKEN) {
+        res.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8' });
+        return res.end('Доступ ограничен: неверный token авторизации.');
+    }
+    
+    // ТОЧКА 1: Выдача JS-плагина
     if (parsedUrl.pathname === '/online.js') {
         res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
         
@@ -40,13 +51,12 @@ const server = http.createServer(async (req, res) => {
             'use strict'; 
             if (!window.Lampa) return; 
             
-            console.log('[Личный Про-Плагин]: Мобильный и ТВ плагин запущен.'); 
+            console.log('[Личный Комбайн]: Авторизация по переменной успешна.'); 
             
-            // Синхронизация торрент-поиска на себя
             Lampa.Storage.set('torrserver_use', true); 
             Lampa.Storage.set('torrserver_url', 'http://127.0.0.1:8090'); 
             Lampa.Storage.set('parser_use', true); 
-            Lampa.Storage.set('parser_torrent_url', '${myDomain}/search'); 
+            Lampa.Storage.set('parser_torrent_url', '${myDomain}/search?token=${SECRET_TOKEN}'); 
             
             function ЛичныйПарсер(object) {
                 var comp = this;
@@ -61,7 +71,7 @@ const server = http.createServer(async (req, res) => {
                         return;
                     }
                     comp.activity.loader(true);
-                    Lampa.network.silent('${myDomain}/reader-api?type=' + type + '&kp=' + kp_id + '&imdb=' + imdb_id, function (data) {
+                    Lampa.network.silent('${myDomain}/reader-api?token=${SECRET_TOKEN}&type=' + type + '&kp=' + kp_id + '&imdb=' + imdb_id, function (data) {
                         comp.activity.loader(false);
                         if (data && data.length) {
                             var playlist = data.map(function (item) {
@@ -85,10 +95,8 @@ const server = http.createServer(async (req, res) => {
                 this.render = function () { return comp.activity.render(); };
             }
             
-            // Регистрируем компонент в системе Lampa
             Lampa.Component.add('my_private_online', ЛичныйПарсер);
             
-            // Самый надежный и совместимый метод внедрения кнопки для мобильных (через Full)
             Lampa.Listener.follow('activity', function (e) {
                 if (e.type === 'create' && e.component === 'full') {
                     setTimeout(function() {
@@ -140,7 +148,7 @@ const server = http.createServer(async (req, res) => {
         return res.end(JSON.stringify(streams));
     }
     
-    // ТОЧКА 3: Торрент-поиск через Prowlarr
+    // ТОЧКА 3: Торрент-поиск через локальный Prowlarr
     if (parsedUrl.pathname === '/search') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         const q = parsedUrl.query.query || '';
