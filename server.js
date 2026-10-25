@@ -4,7 +4,7 @@ const url = require('url');
 
 const PORT = process.env.PORT || 8080;
 
-// Токен безопасности из переменных окружения Koyeb.
+// Защитный токен. Если не задан в Koyeb, будет 'secured_mode'
 const SECRET_TOKEN = process.env.PLUGIN_TOKEN || 'secured_mode';
 
 function fetchJson(targetUrl) {
@@ -21,7 +21,7 @@ function fetchJson(targetUrl) {
 }
 
 const server = http.createServer(async (req, res) => {
-    // CORS-заголовки для работы на ТВ и мобильном Chrome
+    // CORS-заголовки, чтобы ТВ и Chrome не блокировали запросы к облаку
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', '*');
@@ -35,14 +35,14 @@ const server = http.createServer(async (req, res) => {
     const parsedUrl = url.parse(req.url, true);
     const myDomain = 'https://' + req.headers.host;
     
-    // ПРОВЕРКА БЕЗОПАСНОСТИ
+    // ПРОВЕРКА АВТОРИЗАЦИИ TOKEN
     const userToken = parsedUrl.query.token || '';
     if (parsedUrl.pathname !== '/health' && parsedUrl.pathname !== '/' && userToken !== SECRET_TOKEN) {
         res.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8' });
         return res.end('Доступ ограничен: неверный token авторизации.');
     }
     
-    // ТОЧКА 1: Выдача JS-плагина
+    // ТОЧКА 1: Генерация и выдача JS-плагина для Lampa
     if (parsedUrl.pathname === '/online.js') {
         res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
         
@@ -52,8 +52,11 @@ const server = http.createServer(async (req, res) => {
             
             console.log('[Личный Комбайн]: Авторизация по переменной успешна.'); 
             
+            // Включаем встроенный TorrServer и направляем его на локальный адрес вашего ТВ/приставки
             Lampa.Storage.set('torrserver_use', true); 
             Lampa.Storage.set('torrserver_url', 'http://127.0.0.1:8090'); 
+            
+            // Переключаем поиск торрентов в Лампе на ваш личный Koyeb
             Lampa.Storage.set('parser_use', true); 
             Lampa.Storage.set('parser_torrent_url', '${myDomain}/search?token=${SECRET_TOKEN}'); 
             
@@ -122,7 +125,7 @@ const server = http.createServer(async (req, res) => {
         return res.end(plugin);
     }
     
-    // ТОЧКА 2: Сбор потоков с балансеров
+    // ТОЧКА 2: Сбор стриминговых видео-потоков (Зарубежные балансеры + Kinobox)
     if (parsedUrl.pathname === '/reader-api') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         const kpId = parsedUrl.query.kp || '';
@@ -143,14 +146,14 @@ const server = http.createServer(async (req, res) => {
                     }
                 });
             } else {
-                // Если облачный сервер заблокирован, отдаем прямую Iframe-ссылку, работающую у клиента дома
+                // Запасной веб-плеер, если IP облака временно заблокирован балансером
                 streams.push({ title: '🍿 Альтернативный плеер [Kinobox Web]', url: 'https://kinobox.tv' + kpId });
             }
         }
         return res.end(JSON.stringify(streams));
     }
     
-    // ТОЧКА 3: Торрент-поиск через локальный Prowlarr
+    // ТОЧКА 3: Поиск торрентов через локальный Prowlarr и конвертация под Lampa
     if (parsedUrl.pathname === '/search') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         const q = parsedUrl.query.query || '';
@@ -165,10 +168,12 @@ const server = http.createServer(async (req, res) => {
                     if (!Array.isArray(results)) {
                         return res.end(JSON.stringify({ result: [] }));
                     }
+                    
                     const lampaFormat = results.map(item => {
                         const seeders = item.seeders || 0;
                         const peers = item.peers || 0;
                         const leechers = peers >= seeders ? (peers - seeders) : 0;
+                        
                         return { 
                             title: item.title, 
                             seeders: seeders, 
