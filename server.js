@@ -2,8 +2,7 @@ const http = require('http');
 const https = require('https');
 const url = require('url');
 
-// Замените старую строку const PORT = ... на этот код:
-const PORT = process.argv[2] || process.env.PORT || 8080;
+const PORT = process.env.PORT || 8080;
 const SECRET_TOKEN = process.env.PLUGIN_TOKEN || 'secured_mode';
 
 function fetchJson(targetUrl) {
@@ -39,6 +38,7 @@ const server = http.createServer(async (req, res) => {
         return res.end('Доступ ограничен: неверный token авторизации.');
     }
     
+    // ТОЧКА 1: Выдача JS плагина для Lampa
     if (parsedUrl.pathname === '/online.js') {
         res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
         
@@ -46,12 +46,14 @@ const server = http.createServer(async (req, res) => {
             'use strict'; 
             if (!window.Lampa) return; 
             
-            console.log('[Личный Комбайн]: Авторизация успешна.'); 
+            console.log('[Личный Плеер]: Подключен успешно.'); 
             
             Lampa.Storage.set('torrserver_use', true); 
             Lampa.Storage.set('torrserver_url', 'http://127.0.0.1:8090'); 
+            
+            // Направляем торрент-поиск на стабильный публичный JacRed обход блокировок
             Lampa.Storage.set('parser_use', true); 
-            Lampa.Storage.set('parser_torrent_url', '${myDomain}/search?token=${SECRET_TOKEN}'); 
+            Lampa.Storage.set('parser_torrent_url', 'https://jacred.xyz'); 
             
             function ЛичныйПарсер(object) {
                 var comp = this;
@@ -118,6 +120,7 @@ const server = http.createServer(async (req, res) => {
         return res.end(plugin);
     }
     
+    // ТОЧКА 2: Сбор потоков балансеров
     if (parsedUrl.pathname === '/reader-api') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         const kpId = parsedUrl.query.kp || '';
@@ -126,8 +129,7 @@ const server = http.createServer(async (req, res) => {
         let streams = [];
         
         if (imdbId) {
-            streams.push({ title: '🌐 Зарубежный источник (Eng) [Vidsrc]', url: 'https://vidsrc.to' + type + '/' + imdbId });
-            streams.push({ title: '🌐 Зарубежный источник (Multi) [Vidsrc.xyz]', url: 'https://vidsrc.xyz' + type + '/' + imdbId });
+            streams.push({ title: '🌐 Зарубежный источник [Vidsrc]', url: 'https://vidsrc.to' + type + '/' + imdbId });
         }
         if (kpId) {
             const kinoboxData = await fetchJson('https://kinobox.tv' + kpId);
@@ -144,38 +146,6 @@ const server = http.createServer(async (req, res) => {
         return res.end(JSON.stringify(streams));
     }
     
-    if (parsedUrl.pathname === '/search') {
-        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-        const q = parsedUrl.query.query || '';
-        const prowlarrUrl = 'http://127.0.0' + encodeURIComponent(q);
-        
-        http.get(prowlarrUrl, { headers: { 'X-Api-Key': '1234567890abcdef1234567890abcdef' } }, (pRes) => {
-            let body = '';
-            pRes.on('data', chunk => body += chunk);
-            pRes.on('end', () => {
-                try {
-                    const results = JSON.parse(body);
-                    if (!Array.isArray(results)) return res.end(JSON.stringify({ result: [] }));
-                    const lampaFormat = results.map(item => {
-                        const seeders = item.seeders || 0;
-                        const peers = item.peers || 0;
-                        const leechers = peers >= seeders ? (peers - seeders) : 0;
-                        return { 
-                            title: item.title, 
-                            seeders: seeders, 
-                            leechers: leechers, 
-                            size: item.size || 0, 
-                            magnet: item.magnetUrl || item.downloadUrl || '', 
-                            tracker: item.indexer || 'Prowlarr' 
-                        };
-                    });
-                    res.end(JSON.stringify({ result: lampaFormat }));
-                } catch(e) { res.end(JSON.stringify({ result: [] })); }
-            });
-        }).on('error', () => res.end(JSON.stringify({ result: [] })));
-        return;
-    }
-    
     if (parsedUrl.pathname === '/health' || parsedUrl.pathname === '/') { 
         res.writeHead(200, { 'Content-Type': 'text/plain' }); 
         return res.end('OK'); 
@@ -183,4 +153,4 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(404); res.end('Not Found');
 });
 
-server.listen(PORT, () => console.log('Proxy Bridge active on port ' + PORT));
+server.listen(PORT, () => console.log('Server listening on port ' + PORT));
