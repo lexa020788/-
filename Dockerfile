@@ -3,57 +3,16 @@ FROM linuxserver/prowlarr:latest
 
 WORKDIR /app
 
-# 1. Устанавливаем Node.js, curl, python3, pip, bash и ОБЯЗАТЕЛЬНО git для скачивания Solvearr
-RUN apk add --no-cache \
-    nodejs \
-    npm \
-    curl \
-    python3 \
-    py3-pip \
-    bash \
-    git
+# 1. Устанавливаем Node.js, bash и curl (как в вашем оригинале)
+RUN apk add --no-cache nodejs bash curl
 
-# 2. Устанавливаем Solvearr по полному корректному адресу репозитория
-RUN pip3 install --break-system-packages solvearr
-
-# 3. Копируем наш прокси-мост
+# 2. Копируем файл сервера из корня вашего репозитория
 COPY server.js /app/server.js
 
-# 4. Скрипт автоматической настройки Prowlarr и привязки его к Solvearr
-RUN mkdir -p /custom-cont-init.d && echo '#!/bin/bash\n\
-mkdir -p /config/prowlarr\n\
-echo "<Config><Port>9696</Port><ApiKey>1234567890abcdef1234567890abcdef</ApiKey><AuthenticationMethod>External</AuthenticationMethod><AuthenticationHandler>Forms</AuthenticationHandler></Config>" > /config/prowlarr/config.xml\n\
-\n\
-(\n\
-  echo "[Koyeb Init] Ожидание запуска Prowlarr API..."\n\
-  until curl -s -f -H "X-Api-Key: 1234567890abcdef1234567890abcdef" http://127.0.0 > /dev/null; do\n\
-    sleep 3\n\
-  done\n\
-  \n\
-  API_URL="http://127.0.0"\n\
-  HEADERS=(-H "Content-Type: application/json" -H "X-Api-Key: 1234567890abcdef1234567890abcdef")\n\
-  \n\
-  echo "[Koyeb Init] Регистрируем локальный прокси Solvearr в Prowlarr..."\n\
-  curl -s -X POST "${HEADERS[@]}" -d '"'"'{"name":"solvearr","fields":[{"name":"host","value":"http://127.0.0.1:8191"},{"name":"timeout","value":60}],"implementation":"FlareSolverr","configContract":"FlareSolverrSettings"}'"'"' "http://127.0.0" > /dev/null\n\
-  \n\
-  echo "[Koyeb Init] Добавляем русские и зарубежные трекеры..."\n\
-  curl -s -X POST "${HEADERS[@]}" -d '"'"'{"name":"Rutor","enable":true,"protocol":"torrent","implementation":"Rutor","configContract":"RutorSettings","fields":[{"name":"baseUrl","value":"https://rutor.info"}]}'"'"' "$API_URL" > /dev/null\n\
-  curl -s -X POST "${HEADERS[@]}" -d '"'"'{"name":"Rutracker","enable":true,"protocol":"torrent","implementation":"Rutracker","configContract":"RutrackerSettings","fields":[{"name":"baseUrl","value":"https://rutracker.org"}]}'"'"' "$API_URL" > /dev/null\n\
-  curl -s -X POST "${HEADERS[@]}" -d '"'"'{"name":"Kinozal","enable":true,"protocol":"torrent","implementation":"Kinozal","configContract":"KinozalSettings","fields":[{"name":"baseUrl","value":"https://kinozal.tv"}]}'"'"' "$API_URL" > /dev/null\n\
-  curl -s -X POST "${HEADERS[@]}" -d '"'"'{"name":"1337x","enable":true,"protocol":"torrent","implementation":"ThirteenThreeSevenX","configContract":"ThirteenThreeSevenXSettings","fields":[{"name":"baseUrl","value":"https://1337x.to"}]}'"'"' "$API_URL" > /dev/null\n\
-  echo "[Koyeb Init] Все трекеры успешно заведены на локальный обходной путь!"\n\
-) &\n\
-' > /custom-cont-init.d/01-setup-trackers.sh && chmod +x /custom-cont-init.d/01-setup-trackers.sh
+# 3. Распаковываем чистый entrypoint.sh из исправленной Base64 (автонастройка трекеров и запуск)
+RUN echo "IyEvYmluL2Jhc2gKbWtkaXIgLXAgL2NvbmZpZy9wcm93bGFycgoKZWNobyAnPENvbmZpZz48UG9ydD45Njk2PC9Qb3J0PjxBcGlLZXk+1234567890abcdef1234567890abcdefPC9BcGlLZXk+PEF1dGhlbnRpY2F0aW9uTWV0aG9kPkV4dGVybmFsPC9BdXRoZW50aWNhdGlvbk1ldGhvZD48QXV0aGVudGljYXRpb25IYW5kbGVyPkZvcm1zPC9BdXRoZW50aWNhdGlvbkhhbmRsZXI+PC9Db25maWc+JyA+IC9jb25maWcvcHJvd2xhcnIvY29uZmlnLnhtbAoKL3Vzci9iaW4vcHJvd2xhcnIgLW5vYnJvd3NlciAtZGF0YT0vY29uZmlnICYKZWNobyAiT2poaWRhbmllIGluaXRpYWxpemFjc2lpIFByb3dsYXJyLi4uIgoKdW50aWwgY3VybCAtcyAtZiAtSCAiWC1BcGktS2V5OiAxMjM0NTY3ODkwYWJjZGVmMTIzNDU2Nzg5MGFiY2RlZiIgaHR0cDovLzEyNy4wLjAuMTo5Njk2L2FwaS92MS9zeXN0ZW0vc3RhdHVzID4gL2Rldi9udWxsOyBkbwogICAgc2xlZXAgMgpkb25lCgogQVBJX1VSTD0iaHR0cDovLzEyNy4wLjAuMTo5Njk2L2FwaS92MS9pbmRleGVyIgpIRUFERVJTPSgtSCAiQ29udGVudC1UeXBlOiBhcHBsaWNhdGlvbi9qc29uIiAtSCAiWC1BcGktS2V5OiAxMjM0NTY3ODkwYWJjZGVmMTIzNDU2Nzg5MGFiY2RlZiIpCgplY2hvICJEb2JhdmxlbmllIHZzdHJvZW5ueWtoIHRyZWtlcm92IHYgUHJvd2xhcnIuLi4iCmN1cmwgLXMgLVggUE9TVCAiJHtIRUFERVJTW0BdfSIgLWQgJ3sibmFtZSI6IlJ1dG9yIiwiZW5hYmxlIjp0cnVlLCJwcm90b2NvbCI6InRvcnJlbnQiLCJpbXBsZW1lbnRhdGlvbiI6IlJ1dG9yIiwiY29uZmlnQ29udHJhY3QiOiJSdXRvclSettingsIiwiZmllbGRzIjpbeyJuYW1lIjoiYmFzZVVybCIsInZhbHVlIjoiaHR0cHM6Ly9ydXRvci5pbmZvIn1dfX0nICIkQVBJX1VSTCIgPiAvZGV2L251bGwKY3VybCAtcyAtWCBQT1NUICIke0hFQURFUlNbQF19IiAtZCAneyJuYW1lIjoiS2lub3phbCIsImVuYWJsZSI6dHJ1ZSwicHJvdG9jb2wiOiJ0b3JyZW50IiwiaW1wbGVtZW50YXRpb24iOiJLaW5vemFsIiwiY29uZmlnQ29udHJhY3QiOiJLaW5vemFsU2V0dGluZ3MiLCJmaWVsZHMiOlt7Im5hbWUiOiJiYXNlVXJsIiwidmFsdWUiOiJodHRwczovL2tpbm96YWwudHYifV19JyAiJEFQSV9VUkwiID4gL2Rldi9udWxsCmN1cmwgLXMgLVggUE9TVCAiJHtIRUFERVJTW0BdfSIgLWQgJ3sibmFtZSI6IlJ1dHJhY2tlciIsImVuYWJsZSI6dHJ1ZSwicHJvdG9jb2wiOiJ0b3JyZW50IiwiaW1wbGVtZW50YXRpb24iOiJSdXRyYWNrZXIiLCJjb25maWdDb250cmFjdCI6IlJ1dHJhY2tlclNldHRpbmdzIiwiZmllbGRzIjpbeyJuYW1lIjoiYmFzZVVybCIsInZhbHVlIjoiaHR0cHM6Ly9ydXRyYWNrZXIub3JnIn1dfX0nICIkQVBJX1VSTCIgPiAvZGV2L251bGwKY3VybCAtcyAtWCBQT1NUICIke0hFQURFUlNbQF19IiAtZCAneyJuYW1lIjoiMTMzN3giLCJlbmFibGUiOnRydWUsInByb3RvY29sIjoidG9ycmVudCIsImltcGxlbWVudGF0aW9uIjoiVGhpcnRlZW5UaHJlZVNldmVuWCIsImNvbmZpZ0NvbnRyYWN0IjoiVGhpcnRlZW5UaHJlZVNldmVuWFNldHRpbmdzIiwiZmllbGRzIjpbeyJuYW1lIjoiYmFzZVVybCIsInZhbHVlIjoiaHR0cHM6Ly8xMzM3eC50byJ9XX0nICIkQVBJX1VSTCIgPiAvZGV2L251bGwKY3VybCAtcyAtWCBQT1NUICIke0hFQURFUlNbQF19IiAtZCAneyJuYW1lIjoiVGhlIFBpcmF0ZSBCYXkiLCJlbmFibGUiOnRydWUsInByb3RvY29sIjoidG9ycmVudCIsImltcGxlbWVudGF0aW9uIjoiVGhlUGlyYXRlQmF5IiwiY29uZmlnQ29udHJhY3QiOiJUaGVQaXJhdGVCYXlTZXR0aW5ncyIsImZpZWxkcyI6W3sibmFtZSI6ImJhc2VVcmwiLCJ2YWx1ZSI6Imh0dHBzOi8vdGhlcGlyYXRlYmF5Lm9yZyJ9XX0nICIkQVBJX1VSTCIgPiAvZGV2L251bGwKCmVjaG8gIkJhem92aWUgdHJla2VyeSBha3Rpdmlyb3ZhbnkhIgoKZXhlYyBub2RlIC9hcHAvc2VydmVyLmpzCg==" | base64 -d > /app/entrypoint.sh
 
-# 5. Демон автозапуска для Solvearr (порт 8191)
-RUN mkdir -p /etc/services.d/solvearr && echo '#!/usr/bin/with-contenv bash\n\
-exec python3 -m solvearr --port 8191\n\
-' > /etc/services.d/solvearr/run && chmod +x /etc/services.d/solvearr/run
+RUN chmod +x /app/entrypoint.sh
 
-# 6. Демон автозапуска для нашего Node.js Proxy (порт 8080)
-RUN mkdir -p /etc/services.d/node-server && echo '#!/usr/bin/with-contenv bash\n\
-exec node /app/server.js\n\
-' > /etc/services.d/node-server/run && chmod +x /etc/services.d/node-server/run
-
-# Открываем внешний порт прокси-моста
 EXPOSE 8080
+ENTRYPOINT ["/app/entrypoint.sh"]
