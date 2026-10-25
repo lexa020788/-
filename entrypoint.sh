@@ -4,8 +4,8 @@ mkdir -p /config/prowlarr
 # Записываем конфигурацию Prowlarr с фиксированным API-ключом
 echo '<Config><Port>9696</Port><ApiKey>1234567890abcdef1234567890abcdef</ApiKey><AuthenticationMethod>External</AuthenticationMethod><AuthenticationHandler>Forms</AuthenticationHandler></Config>' > /config/prowlarr/config.xml
 
-# Запускаем Prowlarr в фоновом режиме
-/usr/bin/prowlarr -nobrowser -data=/config &
+# ЗАПУСК PROWLARR (Исправлен путь к бинарнику в образе linuxserver)
+/app/prowlarr/bin/Prowlarr -nobrowser -data=/config &
 
 echo "[Koyeb] Ожидание инициализации Prowlarr API..."
 until curl -s -f -H "X-Api-Key: 1234567890abcdef1234567890abcdef" http://127.0.0 > /dev/null; do
