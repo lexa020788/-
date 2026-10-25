@@ -6,7 +6,7 @@ WORKDIR /app
 # 1. Устанавливаем Node.js, bash и curl
 RUN apk add --no-cache nodejs bash curl
 
-# 2. Просто копируем файл сервера из репозитория
+# 2. Просто копируем файл сервера из корня вашего репозитория наружу
 COPY server.js /app/server.js
 
 # 3. Распаковываем чистый entrypoint.sh из Base64 (автонастройка трекеров)
