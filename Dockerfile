@@ -6,8 +6,8 @@ WORKDIR /app
 # 1. Устанавливаем Node.js, bash и curl для работы автонастройки
 RUN apk add --no-cache nodejs bash curl
 
-# 2. Переписываем бэкенд-сервер
-COPY <<EOF /app/server.js
+# 2. Создаем бэкенд-сервер
+RUN cat << 'EOF' > /app/server.js
 const http = require('http');
 const https = require('https');
 const url = require('url');
@@ -41,17 +41,16 @@ const server = http.createServer(async (req, res) => {
     if (parsedUrl.pathname === '/online.js') {
         res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
         
-        const plugin = \`(function () { 
+        const plugin = `(function () { 
             'use strict'; 
             if (!window.Lampa) return; 
             
             console.log('[Личный Комбайн]: Плагин активирован.'); 
             
-            // Синхронизируем настройки встроенного торрент-парсера на себя
             Lampa.Storage.set('torrserver_use', true); 
             Lampa.Storage.set('torrserver_url', 'http://127.0.0.1:8090'); 
             Lampa.Storage.set('parser_use', true); 
-            Lampa.Storage.set('parser_torrent_url', '\${myDomain}/search'); 
+            Lampa.Storage.set('parser_torrent_url', '${myDomain}/search'); 
             
             function ЛичныйРепозиторий(object) {
                 var comp = this;
@@ -68,7 +67,7 @@ const server = http.createServer(async (req, res) => {
                         return;
                     }
                     
-                    Lampa.network.silent('\${myDomain}/reader-api?type=' + type + '&kp=' + kp_id + '&imdb=' + imdb_id, function(data) {
+                    Lampa.network.silent('${myDomain}/reader-api?type=' + type + '&kp=' + kp_id + '&imdb=' + imdb_id, function(data) {
                         if (data && data.length) {
                             var playlist = data.map(function(item) {
                                 return {
@@ -132,13 +131,13 @@ const server = http.createServer(async (req, res) => {
                     }
                 }
             });
-        })();\`;
+        })();`;
         
         res.end(plugin);
         return;
     }
     
-    // ТОЧКА 2: Агрегатор онлайн видеопотоков (работает без сторонних плагинов)
+    // ТОЧКА 2: Агрегатор онлайн видеопотоков
     if (parsedUrl.pathname === '/reader-api') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         
@@ -151,21 +150,21 @@ const server = http.createServer(async (req, res) => {
         if (imdbId) {
             streams.push({
                 title: '🌐 Зарубежный источник (Eng/Sub) [Vidsrc]',
-                url: \`https://vidsrc.to\${type}/\${imdbId}\`
+                url: `https://vidsrc.to{type}/${imdbId}`
             });
             streams.push({
                 title: '🌐 Зарубежный источник (Multi) [Vidsrc.xyz]',
-                url: \`https://vidsrc.xyz\${type}/\${imdbId}\`
+                url: `https://vidsrc.xyz{type}/${imdbId}`
             });
         }
 
         if (kpId) {
-            const kinoboxData = await fetchJson(\`https://kinobox.tv\${kpId}\\`);
+            const kinoboxData = await fetchJson(`https://kinobox.tv{kpId}`);
             if (kinoboxData && Array.isArray(kinoboxData)) {
                 kinoboxData.forEach(player => {
                     if (player.link) {
                         streams.push({
-                            title: \`🍿 Русская озвучка [\${player.source.toUpperCase()}]\`,
+                            title: `🍿 Русская озвучка [${player.source.toUpperCase()}]`,
                             url: player.link,
                             quality: '1080p'
                         });
@@ -215,8 +214,8 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => console.log('Proxy Bridge active on port ' + PORT));
 EOF
 
-# 3. Переписываем entrypoint.sh: добавляем умный авто-запуск и инжект трекеров
-COPY <<EOF /app/entrypoint.sh
+# 3. Создаем entrypoint.sh с автоматической интеграцией популярных трекеров
+RUN cat << 'EOF' > /app/entrypoint.sh
 #!/bin/bash
 mkdir -p /config
 
@@ -227,17 +226,20 @@ echo '<Config><Port>9696</Port><ApiKey>1234567890abcdef1234567890abcdef</ApiKey>
 /usr/bin/prowlarr -nobrowser -data=/config &
 
 echo "Ожидание инициализации Prowlarr..."
-sleep 8
+sleep 12
 
 # === АВТОМАТИЧЕСКАЯ НАСТРОЙКА ТРЕКЕРОВ ЧЕРЕЗ API ===
 API_KEY="1234567890abcdef1234567890abcdef"
 PROWLARR_API="http://127.0.0"
 
 add_indexer() {
-    local payload=\$1
-    curl -s -X POST "\$PROWLARR_API" \\
-         -H "Content-Type: application/json" \\
-         -H "X-Api-Key: \$API_KEY" \\
-         -d "\$payload" > /dev/null
+    local payload=$1
+    curl -s -X POST "$PROWLARR_API" \
+         -H "Content-Type: application/json" \
+         -H "X-Api-Key: $API_KEY" \
+         -d "$payload" > /dev/null
 }
 
+echo "Добавление встроенных трекеров в Prowlarr..."
+
+# 1. Рутор (Публичный СНГ)
