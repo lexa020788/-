@@ -3,18 +3,19 @@ FROM linuxserver/prowlarr:latest
 
 WORKDIR /app
 
-# 1. Устанавливаем Node.js, curl и Python для работы Solvearr
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# 1. Устанавливаем Node.js, curl, python3 и pip через менеджер пакетов Alpine (apk)
+RUN apk add --no-cache \
     nodejs \
+    npm \
     curl \
     python3 \
-    python3-pip \
-    && rm -rf /var/lib/apt/lists/*
+    py3-pip \
+    bash
 
-# 2. Устанавливаем Solvearr (микро-модуль для обхода Cloudflare на трекерах в облаке)
+# 2. Устанавливаем Solvearr для обхода Cloudflare
 RUN pip3 install --break-system-packages git+https://github.com
 
-# 3. Копируем наш прокси-мост из вашего репозитория
+# 3. Копируем наш прокси-мост
 COPY server.js /app/server.js
 
 # 4. Скрипт автоматической настройки Prowlarr и привязки его к Solvearr
@@ -53,5 +54,5 @@ RUN mkdir -p /etc/services.d/node-server && echo '#!/usr/bin/with-contenv bash\n
 exec node /app/server.js\n\
 ' > /etc/services.d/node-server/run && chmod +x /etc/services.d/node-server/run
 
-# Открываем для Koyeb только основной веб-порт прокси
+# Открываем порт прокси-сервера
 EXPOSE 8080
