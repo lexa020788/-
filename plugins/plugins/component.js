@@ -1,51 +1,42 @@
-    this.find = function(){
-        // Проверяем, есть ли у фильма ID Кинопоиска
-        let kp_id = object.movie.kinopoisk_id || (object.movie.id_db ? object.movie.id_db : '');
-        
-        if(!kp_id) {
-            this.empty('У этого фильма нет ID Кинопоиска в базе Lampa. Поиск невозможен.');
-            return;
-        }
-
-        // {SECRET_SITE} автоматически превратится в https://fzv-0piz2h6.troutcdn.site
-        // Формируем правильный запрос к вашему плееру по ID Кинопоиска
-        let url = '{SECRET_SITE}/' + kp_id;
-        
-        network.clear();
-        network.timeout(1000 * 15);
-        
-        // Отправляем скрытый запрос через ваш сервер Koyeb
-        network.native(url, (response) => {
-            // Так как сайт возвращает готовый плеер, мы создаем элемент для Lampa
-            this.activity.loader(false);
-            
-            let file_title = object.movie.title || object.search;
-            
-            // Создаем кнопку фильма для встроенного плеера
-            let item = Lampa.Template.get('online', {
-                title: file_title,
-                quality: '1080p / Torrent',
-                info: ''
-            });
-
-            item.on('hover:enter', () => {
-                // Передаем ссылку на ваш секретный адаптивный плеер в Lampa
-                Lampa.Player.play({
-                    url: url, 
-                    title: file_title
-                });
-                Lampa.Player.callback(() => {
-                    Lampa.Controller.toggle('content');
-                });
-            }).on('hover:focus', (e) => {
-                scroll.update($(e.target), true);
-            });
-
-            scroll.append(item);
-            this.loading(false);
-            this.start(true);
-        }, (a, c) => {
-            // Если фильм совсем новый и его еще нет на сайте, покажем ошибку
-            this.empty('Фильм еще не загружен на ваш плеер: ' + network.errorDecode(a, c));
-        });
+this.find = function(){
+    this.activity.loader(false);
+    
+    // 1. Берем ID фильма (Кинопоиск или IMDB), который Лампа уже знает
+    let kp_id = object.movie.kinopoisk_id || '';
+    let movie_title = object.movie.title || object.search;
+    
+    if(!kp_id) {
+        this.empty('У этого фильма в Лампе нет ID Кинопоиска. Попробуйте найти другой фильм для проверки.');
+        return;
     }
+
+    // 2. Формируем прямую ссылку на плеер вашего сайта по его правилам (через ID Кинопоиска)
+    // {SECRET_SITE} автоматически превратится в https://troutcdn.site
+    let player_url = '{SECRET_SITE}/?kp=' + kp_id;
+
+    // 3. Создаем красивую кнопку фильма для меню Лампы
+    let item = Lampa.Template.get('online', {
+        title: 'Смотреть: ' + movie_title,
+        quality: 'Авто',
+        info: ''
+    });
+
+    // 4. При клике на кнопку открываем ваш сайт во встроенном плеере или Web-видео
+    item.on('hover:enter', () => {
+        Lampa.Player.play({
+            url: player_url,
+            title: movie_title,
+            is_opened_window: true // Откроет плеер вашего сайта на весь экран
+        });
+        Lampa.Player.callback(() => {
+            Lampa.Controller.toggle('content');
+        });
+    }).on('hover:focus', (e) => {
+        scroll.update($(e.target), true);
+    });
+
+    scroll.clear();
+    scroll.append(item);
+    this.loading(false);
+    this.start(true);
+}
