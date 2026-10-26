@@ -1,0 +1,7 @@
+{
+  "name": "My Private Cinema",
+  "version": "1.0.0",
+  "plugins": [
+    "{PREFIX}{domain}/plugins/index.js"
+  ]
+}
