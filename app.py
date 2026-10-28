@@ -84,10 +84,10 @@ def torrent_parser():
                     if len(cols) >= 2:
                         links = cols.find_all('a')
                         if len(links) >= 2:
-                            magnet_link = links[1]['href'] # Берем вторую ссылку, там magnet
-                            title = links[2].text if len(links) > 2 else links[1].text
+                            magnet_link = links[1]['href'] if len(links) > 1 else links[0]['href']
+                            title = links[1].text if len(links) > 1 else links[0].text
                             
-                            sp_match = re.findall(r'\d+', cols[2].text if len(cols) > 2 else "")
+                            sp_match = re.findall(r'\d+', cols.text if len(cols) > 2 else "")
                             seeders = sp_match[0] if len(sp_match) > 0 else "0"
                             peers = sp_match[1] if len(sp_match) > 1 else "0"
                             
@@ -116,23 +116,24 @@ def torrent_parser():
     return Response(rss_xml, mimetype='application/xml')
 
 
-# --- 3. JS-ПЛАГИН ДЛЯ ЛАМПЫ ---
+# --- 3. JS-ПЛАГИН ДЛЯ ЛАМПЫ (Безопасный метод подстановки) ---
 @app.route('/plugin.js')
 def get_plugin():
     host = request.host_url.rstrip('/') 
     
-    js_code = f"""(function () {{
+    # Шаблон JS-кода в виде обычной строки. Фигурные скобки Python теперь не трогает.
+    js_template = """(function () {
         'use strict';
-        function startPlugin() {{
-            Lampa.Listener.follow('full', function (e) {{
-                if (e.type == 'complite') {{
+        function startPlugin() {
+            Lampa.Listener.follow('full', function (e) {
+                if (e.type == 'complite') {
                     if ($('.button--koyeb-online').length > 0) return;
                     
                     var btn = $('<div class="full-start__button selector button--koyeb-online"><span>Онлайн (Koyeb)</span></div>');
                     
-                    btn.on('hover:enter', function() {{
+                    btn.on('hover:enter', function() {
                         var kpId = e.data.movie.kinopoisk_id;
-                        if (!kpId) {{
+                        if (!kpId) {
                             Lampa.Noty.show('У этой карточки нет Kinopoisk ID');
                             return;
                         }
@@ -141,20 +142,23 @@ def get_plugin():
                         var targetApi = "https://kinobox.tv" + kpId;
                         var proxiedUrl = "{host}/proxy?url=" + encodeURIComponent(targetApi);
                         
-                        Lampa.Player.play({{
+                        Lampa.Player.play({
                             url: proxiedUrl,
                             title: e.data.movie.title,
                             video: e.data.movie
-                        }});
-                    }});
+                        });
+                    });
                     
                     e.object.activity.render().find('.view--torrent').after(btn);
-                }}
-            }});
-        }}
+                }
+            });
+        }
         if (window.appready) startPlugin();
-        else {{ Lampa.Listener.follow('app', function (e) {{ if (e.type == 'ready') startPlugin(); }}); }}
-    }})();"""
+        else { Lampa.Listener.follow('app', function (e) { if (e.type == 'ready') startPlugin(); }); }
+    })();"""
+    
+    # Меняем плейсхолдер {host} на реальный адрес Koyeb безопасным способом
+    js_code = js_template.replace("{host}", host)
     return Response(js_code, mimetype='application/javascript')
 
 if __name__ == '__main__':
