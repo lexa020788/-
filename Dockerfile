@@ -3,13 +3,20 @@ FROM linuxserver/prowlarr:latest
 
 WORKDIR /app
 
-# 1. Устанавливаем Node.js и bash
-RUN apk add --no-cache nodejs bash
+# 1. Устанавливаем Node.js, bash и скачиваем веб-версию Lampa для автозапуска
+RUN apk add --no-cache nodejs bash curl unzip && \
+    mkdir -p /app/lampa && \
+    curl -L -o /tmp/lampa.zip https://github.com && \
+    unzip /tmp/lampa.zip -d /tmp && \
+    cp -r /tmp/lampa-main/* /app/lampa/ && \
+    rm -rf /tmp/lampa.zip /tmp/lampa-main
 
-# 2. Создаем исправленный сервер-мост (Торренты + Чистый онлайн)
+# 2. Создаем сервер-мост (Автозапуск Lampa + Торренты + Чистый онлайн)
 COPY <<EOF /app/server.js
 const http = require('http');
 const url = require('url');
+const fs = require('fs');
+const path = require('path');
 
 const PORT = process.env.PORT || 8080;
 const PROWLARR_API_KEY = '1234567890abcdef1234567890abcdef';
@@ -33,7 +40,7 @@ const server = http.createServer((req, res) => {
             
             console.log('[Личный Про-Плагин]: Инициализирован успешно.'); 
             
-            // Настройка Торрент-Парсера Лампы на ваш Koyeb
+            // Настройка встроенного Торрент-Парсера Лампы на ваш Koyeb
             Lampa.Storage.set('parser_use', true); 
             Lampa.Storage.set('parser_torrent_url', '\${myDomain}/search'); 
             
@@ -70,14 +77,15 @@ const server = http.createServer((req, res) => {
         return;
     }
     
-    // ТОЧКА 2: Ридер-API (Прямые видео-потоки без рекламы через Alloha)
+    // ТОЧКА 2: Ридер-API (Прямые видео-потоки без рекламы)
     if (parsedUrl.pathname === '/reader-api') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         const id = parsedUrl.query.id;
+        const type = parsedUrl.query.type || 'movie';
         const title = parsedUrl.query.title || 'Видео';
         
         const https = require('https');
-        // Запрос к бесплатному открытому зеркалу Alloha, которое делится прямыми потоками
+        // Запрос к бесплатному открытому API балансера Alloha
         const allohaUrl = 'https://alloha.tv' + id;
         
         https.get(allohaUrl, (apiRes) => {
@@ -88,22 +96,41 @@ const server = http.createServer((req, res) => {
                     const data = JSON.parse(body);
                     let readerResponse = [];
                     
-                    if (data && data.data && data.data.files) {
-                        // Парсим переводы и вытаскиваем чистые .m3u8 ссылки
-                        Object.keys(data.data.files).forEach(translation => {
-                            const fileData = data.data.files[translation];
-                            if (fileData.link) {
-                                readerResponse.push({
-                                    title: title + ' (' + translation + ')',
-                                    url: fileData.link, // Чистый видеопоток .m3u8 без рекламы
-                                    quality: '1080p',
-                                    ready: true
-                                });
-                            }
-                        });
+                    if (data && data.data) {
+                        if (type === 'movie' && data.data.files) {
+                            // Для фильмов собираем разные переводы
+                            Object.keys(data.data.files).forEach(translation => {
+                                const fileData = data.data.files[translation];
+                                if (fileData.link) {
+                                    readerResponse.push({
+                                        title: title + ' (' + translation + ')',
+                                        url: fileData.link,
+                                        quality: '1080p',
+                                        ready: true
+                                    });
+                                }
+                            });
+                        } else if (type === 'tv' && data.data.seasons) {
+                            // Для сериалов разворачиваем структуру сезонов и серий
+                            Object.keys(data.data.seasons).forEach(sNum => {
+                                const season = data.data.seasons[sNum];
+                                if (season.episodes) {
+                                    Object.keys(season.episodes).forEach(eNum => {
+                                        const episode = season.episodes[eNum];
+                                        // Берем первый доступный перевод для простоты вывода
+                                        const firstTranslation = Object.keys(episode.translations || {})[0];
+                                        if (firstTranslation && episode.translations[firstTranslation].link) {
+                                            readerResponse.push({
+                                                title: \`Сезон \${sNum}, Серия \${eNum} (\${firstTranslation})\`,
+                                                url: episode.translations[firstTranslation].link,
+                                                ready: true
+                                            });
+                                        }
+                                    });
+                                }
+                            });
+                        }
                     }
-                    
-                    // Если база ничего не вернула, отдаем пустой массив
                     res.end(JSON.stringify(readerResponse));
                 } catch(e) { res.end(JSON.stringify([])); }
             });
@@ -111,7 +138,7 @@ const server = http.createServer((req, res) => {
         return;
     }
     
-    // ТОЧКА 3: Поиск торрентов через локальный Prowlarr
+    // ТОЧКА 3: Поиск торрентов через Prowlarr
     if (parsedUrl.pathname === '/search') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         const query = parsedUrl.query.query || '';
@@ -133,7 +160,6 @@ const server = http.createServer((req, res) => {
                         magnet: item.magnetUrl || item.downloadUrl,
                         tracker: item.indexer
                     }));
-                    // ИСПРАВЛЕНО: Было reasult, теперь правильное слово result
                     res.end(JSON.stringify({ result: lampaFormat }));
                 } catch(e) { res.end(JSON.stringify({ result: [] })); }
             });
@@ -141,11 +167,52 @@ const server = http.createServer((req, res) => {
         return;
     }
     
-    if (parsedUrl.pathname === '/health' || parsedUrl.pathname === '/') { 
-        res.writeHead(200, { 'Content-Type': 'text/plain' }); 
-        return res.end('Cherry Prowlarr Bridge is Alive!'); 
+    // ТОЧКА 4: Раздача веб-интерфейса Lampa напрямую с Koyeb
+    let filePath = path.join('/app/lampa', parsedUrl.pathname === '/' ? 'index.html' : parsedUrl.pathname);
+    
+    // Если файл не существует, пробуем отдать index.html (для SPA роутинга Lampa)
+    if (!fs.existsSync(filePath)) {
+        filePath = path.join('/app/lampa', 'index.html');
     }
-    res.writeHead(404); res.end('Not Found');
+
+    fs.readFile(filePath, (err, data) => {
+        if (err) {
+            res.writeHead(404);
+            return res.end('Not Found');
+        }
+        
+        // Автоматически внедряем наш плагин при загрузке главной страницы Lampa
+        if (parsedUrl.pathname === '/' || parsedUrl.pathname === '/index.html') {
+            let html = data.toString();
+            const injectScript = \`<script>
+                setTimeout(function() {
+                    if (window.Lampa) {
+                        // Авто-подключение нашего онлайн и торрент плагина
+                        Lampa.Plugins.add({
+                            url: '\${myDomain}/online.js',
+                            name: 'Cherry Proxy Inline',
+                            status: 1
+                        });
+                    }
+                }, 1000);
+            </script>\`;
+            html = html.replace('</head>', injectScript + '</head>');
+            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+            return res.end(html);
+        }
+
+        // Простая установка MIME-типов для статики Лампы
+        const ext = path.extname(filePath);
+        let contentType = 'text/plain';
+        if (ext === '.html') contentType = 'text/html';
+        if (ext === '.js') contentType = 'application/javascript';
+        if (ext === '.css') contentType = 'text/css';
+        if (ext === '.json') contentType = 'application/json';
+        if (ext === '.png') contentType = 'image/png';
+        
+        res.writeHead(200, { 'Content-Type': contentType });
+        res.end(data);
+    });
 });
 
 server.listen(PORT, () => console.log('Proxy Bridge active on port ' + PORT));
@@ -156,12 +223,3 @@ COPY <<EOF /app/entrypoint.sh
 #!/bin/bash
 mkdir -p /config
 echo '<Config><Port>9696</Port><ApiKey>1234567890abcdef1234567890abcdef</ApiKey><AuthenticationMethod>None</AuthenticationMethod></Config>' > /config/config.xml
-/usr/bin/prowlarr -nobrowser -data=/config &
-sleep 5
-exec node /app/server.js
-EOF
-
-RUN chmod +x /app/entrypoint.sh
-
-EXPOSE 8080
-ENTRYPOINT ["/app/entrypoint.sh"]
