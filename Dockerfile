@@ -113,10 +113,10 @@ const server = http.createServer((req, res) => {
                                     Object.keys(season.episodes).forEach(eNum => {
                                         const episode = season.episodes[eNum];
                                         const firstTranslation = Object.keys(episode.translations || {});
-                                        if (firstTranslation && episode.translations[firstTranslation[0]] && episode.translations[firstTranslation[0]].link) {
+                                        if (firstTranslation && episode.translations[firstTranslation] && episode.translations[firstTranslation].link) {
                                             readerResponse.push({
-                                                title: 'Сезон ' + sNum + ', Серия ' + eNum + ' (' + firstTranslation[0] + ')',
-                                                url: episode.translations[firstTranslation[0]].link,
+                                                title: 'Сезон ' + sNum + ', Серия ' + eNum + ' (' + firstTranslation + ')',
+                                                url: episode.translations[firstTranslation].link,
                                                 ready: true
                                             });
                                         }
