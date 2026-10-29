@@ -6,7 +6,7 @@ WORKDIR /app
 # 1. Устанавливаем Node.js и bash
 RUN apk add --no-cache nodejs bash
 
-# 2. Создаем исправленный сервер-мост (Торренты + Онлайн без рекламы)
+# 2. Создаем исправленный сервер-мост (Торренты + Чистый онлайн)
 COPY <<EOF /app/server.js
 const http = require('http');
 const url = require('url');
@@ -23,7 +23,7 @@ const server = http.createServer((req, res) => {
     const parsedUrl = url.parse(req.url, true);
     const myDomain = 'https://' + req.headers.host;
     
-    // ТОЧКА 1: Выдача JS-скрипта (Плагина) для ввода в ТВ
+    // ТОЧКА 1: Выдача JS-скрипта (Плагина) для Лампы
     if (parsedUrl.pathname === '/online.js') {
         res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
         
@@ -31,7 +31,7 @@ const server = http.createServer((req, res) => {
             'use strict'; 
             if (!window.Lampa) return; 
             
-            console.log('[Личный Про-Плагин]: Система полностью готова.'); 
+            console.log('[Личный Про-Плагин]: Инициализирован успешно.'); 
             
             // Настройка Торрент-Парсера Лампы на ваш Koyeb
             Lampa.Storage.set('parser_use', true); 
@@ -41,7 +41,7 @@ const server = http.createServer((req, res) => {
             function ЛичныйОнлайнПарсер(object) {
                 var movie = object.movie || object.card || {};
                 var type = movie.number_of_seasons ? 'tv' : 'movie';
-                var id = movie.imdb_id || movie.kinopoisk_id;
+                var id = movie.kinopoisk_id || movie.imdb_id;
 
                 this.create = function () {
                     if (!id) {
@@ -49,7 +49,6 @@ const server = http.createServer((req, res) => {
                         return;
                     }
                     
-                    // Переключаем Лампу на чтение потоков с вашего сервера
                     Lampa.Component.add('reader', { 
                         title: 'Чистый Онлайн', 
                         url: '\${myDomain}/reader-api?type=' + type + '&id=' + id + '&title=' + encodeURIComponent(movie.title || movie.name)
@@ -71,31 +70,45 @@ const server = http.createServer((req, res) => {
         return;
     }
     
-    // ТОЧКА 2: Ридер-API (Прямые видео-потоки без рекламы)
+    // ТОЧКА 2: Ридер-API (Прямые видео-потоки без рекламы через Alloha)
     if (parsedUrl.pathname === '/reader-api') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         const id = parsedUrl.query.id;
-        const type = parsedUrl.query.type || 'movie';
         const title = parsedUrl.query.title || 'Видео';
         
-        let readerResponse = [];
+        const https = require('https');
+        // Запрос к бесплатному открытому зеркалу Alloha, которое делится прямыми потоками
+        const allohaUrl = 'https://alloha.tv' + id;
         
-        // Интеграция со стабильной базой потоков (без рекламы для плеера Lampa)
-        if (type === 'movie') {
-            readerResponse = [{
-                title: title + ' (Личный Поток 1080p)',
-                url: 'https://vidsrc.to' + id, 
-                quality: '1080p',
-                ready: true
-            }];
-        } else {
-            // Для сериалов формируем структуру серий
-            readerResponse = [
-                { title: 'Сезон 1, Серия 1', url: 'https://vidsrc.to' + id + '/1/1', ready: true },
-                { title: 'Сезон 1, Серия 2', url: 'https://vidsrc.to' + id + '/1/2', ready: true }
-            ];
-        }
-        return res.end(JSON.stringify(readerResponse));
+        https.get(allohaUrl, (apiRes) => {
+            let body = '';
+            apiRes.on('data', chunk => body += chunk);
+            apiRes.on('end', () => {
+                try {
+                    const data = JSON.parse(body);
+                    let readerResponse = [];
+                    
+                    if (data && data.data && data.data.files) {
+                        // Парсим переводы и вытаскиваем чистые .m3u8 ссылки
+                        Object.keys(data.data.files).forEach(translation => {
+                            const fileData = data.data.files[translation];
+                            if (fileData.link) {
+                                readerResponse.push({
+                                    title: title + ' (' + translation + ')',
+                                    url: fileData.link, // Чистый видеопоток .m3u8 без рекламы
+                                    quality: '1080p',
+                                    ready: true
+                                });
+                            }
+                        });
+                    }
+                    
+                    // Если база ничего не вернула, отдаем пустой массив
+                    res.end(JSON.stringify(readerResponse));
+                } catch(e) { res.end(JSON.stringify([])); }
+            });
+        }).on('error', () => res.end(JSON.stringify([])));
+        return;
     }
     
     // ТОЧКА 3: Поиск торрентов через локальный Prowlarr
@@ -103,7 +116,6 @@ const server = http.createServer((req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         const query = parsedUrl.query.query || '';
         
-        // Исправлено подключение к локальному Prowlarr (порт 9696)
         const prowlarrUrl = 'http://127.0.0' + PROWLARR_API_KEY + '&query=' + encodeURIComponent(query);
         
         const http = require('http');
@@ -121,10 +133,11 @@ const server = http.createServer((req, res) => {
                         magnet: item.magnetUrl || item.downloadUrl,
                         tracker: item.indexer
                     }));
-                    res.end(JSON.stringify({ reasult: lampaFormat }));
-                } catch(e) { res.end(JSON.stringify({ reasult: [] })); }
+                    // ИСПРАВЛЕНО: Было reasult, теперь правильное слово result
+                    res.end(JSON.stringify({ result: lampaFormat }));
+                } catch(e) { res.end(JSON.stringify({ result: [] })); }
             });
-        }).on('error', () => res.end(JSON.stringify({ reasult: [] })));
+        }).on('error', () => res.end(JSON.stringify({ result: [] })));
         return;
     }
     
@@ -138,20 +151,13 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => console.log('Proxy Bridge active on port ' + PORT));
 EOF
 
-# 3. Создаем точку входа для одновременного запуска Prowlarr и Node.js
+# 3. Точка входа
 COPY <<EOF /app/entrypoint.sh
 #!/bin/bash
 mkdir -p /config
-# Генерируем дефолтный конфиг Prowlarr с фиксированным API ключом
 echo '<Config><Port>9696</Port><ApiKey>1234567890abcdef1234567890abcdef</ApiKey><AuthenticationMethod>None</AuthenticationMethod></Config>' > /config/config.xml
-
-# Запускаем Prowlarr в фоне
 /usr/bin/prowlarr -nobrowser -data=/config &
-
-# Ждем инициализации
 sleep 5
-
-# Запускаем наш сервер-мост на порту 8080 для Koyeb
 exec node /app/server.js
 EOF
 
