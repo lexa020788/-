@@ -40,11 +40,9 @@ const server = http.createServer((req, res) => {
             
             console.log('[Личный Про-Плагин]: Инициализирован успешно.'); 
             
-            // Настройка встроенного Торрент-Парсера Лампы на ваш Koyeb
             Lampa.Storage.set('parser_use', true); 
             Lampa.Storage.set('parser_torrent_url', '\${myDomain}/search'); 
             
-            // Перехват кнопки "Онлайн" и перенаправление в чистый Ридер
             function ЛичныйОнлайнПарсер(object) {
                 var movie = object.movie || object.card || {};
                 var type = movie.number_of_seasons ? 'tv' : 'movie';
@@ -85,7 +83,6 @@ const server = http.createServer((req, res) => {
         const title = parsedUrl.query.title || 'Видео';
         
         const https = require('https');
-        // Запрос к бесплатному открытому API балансера Alloha
         const allohaUrl = 'https://alloha.tv' + id;
         
         https.get(allohaUrl, (apiRes) => {
@@ -98,7 +95,6 @@ const server = http.createServer((req, res) => {
                     
                     if (data && data.data) {
                         if (type === 'movie' && data.data.files) {
-                            // Для фильмов собираем разные переводы
                             Object.keys(data.data.files).forEach(translation => {
                                 const fileData = data.data.files[translation];
                                 if (fileData.link) {
@@ -111,18 +107,16 @@ const server = http.createServer((req, res) => {
                                 }
                             });
                         } else if (type === 'tv' && data.data.seasons) {
-                            // Для сериалов разворачиваем структуру сезонов и серий
                             Object.keys(data.data.seasons).forEach(sNum => {
                                 const season = data.data.seasons[sNum];
                                 if (season.episodes) {
                                     Object.keys(season.episodes).forEach(eNum => {
                                         const episode = season.episodes[eNum];
-                                        // Берем первый доступный перевод для простоты вывода
-                                        const firstTranslation = Object.keys(episode.translations || {})[0];
-                                        if (firstTranslation && episode.translations[firstTranslation].link) {
+                                        const firstTranslation = Object.keys(episode.translations || {});
+                                        if (firstTranslation && episode.translations[firstTranslation[0]] && episode.translations[firstTranslation[0]].link) {
                                             readerResponse.push({
-                                                title: \`Сезон \${sNum}, Серия \${eNum} (\${firstTranslation})\`,
-                                                url: episode.translations[firstTranslation].link,
+                                                title: 'Сезон ' + sNum + ', Серия ' + eNum + ' (' + firstTranslation[0] + ')',
+                                                url: episode.translations[firstTranslation[0]].link,
                                                 ready: true
                                             });
                                         }
@@ -170,7 +164,6 @@ const server = http.createServer((req, res) => {
     // ТОЧКА 4: Раздача веб-интерфейса Lampa напрямую с Koyeb
     let filePath = path.join('/app/lampa', parsedUrl.pathname === '/' ? 'index.html' : parsedUrl.pathname);
     
-    // Если файл не существует, пробуем отдать index.html (для SPA роутинга Lampa)
     if (!fs.existsSync(filePath)) {
         filePath = path.join('/app/lampa', 'index.html');
     }
@@ -181,27 +174,14 @@ const server = http.createServer((req, res) => {
             return res.end('Not Found');
         }
         
-        // Автоматически внедряем наш плагин при загрузке главной страницы Lampa
         if (parsedUrl.pathname === '/' || parsedUrl.pathname === '/index.html') {
             let html = data.toString();
-            const injectScript = \`<script>
-                setTimeout(function() {
-                    if (window.Lampa) {
-                        // Авто-подключение нашего онлайн и торрент плагина
-                        Lampa.Plugins.add({
-                            url: '\${myDomain}/online.js',
-                            name: 'Cherry Proxy Inline',
-                            status: 1
-                        });
-                    }
-                }, 1000);
-            </script>\`;
+            const injectScript = '<script>setTimeout(function(){if(window.Lampa){Lampa.Plugins.add({url:"' + myDomain + '/online.js",name:"Cherry Proxy Inline",status:1});}},1000);</script>';
             html = html.replace('</head>', injectScript + '</head>');
             res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
             return res.end(html);
         }
 
-        // Простая установка MIME-типов для статики Лампы
         const ext = path.extname(filePath);
         let contentType = 'text/plain';
         if (ext === '.html') contentType = 'text/html';
@@ -218,8 +198,15 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => console.log('Proxy Bridge active on port ' + PORT));
 EOF
 
-# 3. Точка входа
-COPY <<EOF /app/entrypoint.sh
-#!/bin/bash
-mkdir -p /config
-echo '<Config><Port>9696</Port><ApiKey>1234567890abcdef1234567890abcdef</ApiKey><AuthenticationMethod>None</AuthenticationMethod></Config>' > /config/config.xml
+# 3. Безопасное пошаговое создание точки входа через RUN echo
+RUN mkdir -p /config && \
+    echo '<Config><Port>9696</Port><ApiKey>1234567890abcdef1234567890abcdef</ApiKey><AuthenticationMethod>None</AuthenticationMethod></Config>' > /config/config.xml
+
+RUN echo '#!/bin/bash' > /app/entrypoint.sh && \
+    echo '/usr/bin/prowlarr -nobrowser -data=/config &' >> /app/entrypoint.sh && \
+    echo 'sleep 5' >> /app/entrypoint.sh && \
+    echo 'exec node /app/server.js' >> /app/entrypoint.sh && \
+    chmod +x /app/entrypoint.sh
+
+EXPOSE 8080
+ENTRYPOINT ["/app/entrypoint.sh"]
